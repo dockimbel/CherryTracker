@@ -53,7 +53,7 @@ in `mods/`.
 
 ## Build
 
-[Download](https://www.red-lang.org/p/download.html) the latest toolchain binary (Automates builds section), rename it to `redc` and drop it in the repo.
+[Download](https://www.red-lang.org/p/download.html) the latest toolchain binary ("Automates builds" section), rename it to `redc` and drop it in the repo.
 
 Windows:
 ```
@@ -63,6 +63,7 @@ Linux:
 ```
 ./redc -r -s -t Linux-GTK -o CherryTracker player.red
 ```
+For Linux, ensure that you have the 32-bit dependencies installed (see the bottom of the Download page).
 
 Prebuilt statically linked binaries for Windows and Linux available in `builds/`.
 
