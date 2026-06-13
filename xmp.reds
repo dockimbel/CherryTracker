@@ -79,7 +79,7 @@ xmp-frame-info!: alias struct! [
 ;--  Imports
 ;-- ============================================================
 #import [
-    "libxmp" cdecl [
+    "libs/libxmp" cdecl [
         xmp_create_context:  "xmp_create_context"  [ return: [int-ptr!] ]
         xmp_free_context:    "xmp_free_context"     [ ctx [int-ptr!] ]
         xmp_test_module:     "xmp_test_module"      [ path [c-string!] info [int-ptr!] return: [integer!] ]

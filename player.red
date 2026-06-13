@@ -2,12 +2,7 @@ Red [
     Title:  "CherryTracker — module player"
     Author: "Nenad Rakocevic"
     Needs:  'View
-    Icon:   %cherry.ico
-    Note:   {Playback-only Amiga-ProTracker-style module player. libxmp decodes,
-             SDL3 plays. FFI bridges + snapshot-FIFO audio/visual sync + a
-             FlodPro-style Draw UI at 1024x768 real pixels.
-             Build: D:\DevAI\Tools\redc.exe -c player.red
-             libxmp.dll + SDL3.dll + cherry256.png must sit next to the exe.}
+    Icon:   %assets/cherry.ico
 ]
 
 ;===============================================================================
@@ -629,7 +624,9 @@ measure-fonts: does [
 ;-- helpers --------------------------------------------------------------------
 ;-- one-time builders, used to fill the string tables below; the render loop
 ;-- itself never builds a string (see the zero-allocation note before render)
+
 pad2: func [n][ either n < 10 [ rejoin ["0" n] ][ form n ] ]
+
 hex2: func [v /local hi lo][
     if v < 0 [ v: 0 ]
     hi: to integer! (v / 16)

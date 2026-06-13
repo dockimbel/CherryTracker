@@ -10,7 +10,7 @@ the Red **Draw** dialect in a resizable window.
 
 ## Features
 
-- Plays **MOD / XM / S3M / IT / …** — every format libxmp supports.
+- Plays **MOD / XM / S3M / IT / …** — every format libxmp supports, up to 64 channels.
 
 - **Spectrum analyzer** — a real frequency display: 48 log-spaced Goertzel
   bands (55 Hz–12 kHz) over the Hann-windowed output PCM, colour-by-height
@@ -49,14 +49,16 @@ in `mods/`.
 
 Windows:
 ```
-redc.exe -r -s -t Windows -o CherryTracker.exe player.red   release (static, self-contained, GUI)
+redc.exe -r -s -t Windows -o CherryTracker.exe player.red
 ```
 Linux:
 ```
-redc.exe -r -s -t Linux-GTK -o CherryTracker.exe player.red   release (static, self-contained, GUI)
+redc.exe -r -s -t Linux-GTK -o CherryTracker.exe player.red
 ```
 
-x86 dependencies:
+Prebuilt statically linked binaries for Windows and Linux available in `builds/`.
+
+x86 dependencies for compilation (prebuilt versions available in `builds/`):
 
 - **libxmp** — [upstream](https://github.com/libxmp/libxmp) 
 - **SDL3** — [upstream](https://github.com/libsdl-org/SDL)
