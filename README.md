@@ -1,7 +1,13 @@
-<h1 tabindex="-1" class="heading-element" dir="auto">
-  <img src="assets/cherry256.png" width="80">
-  CherryTracker
-</h1>
+<table>
+<tr>
+  <td valign="middle">
+     <img src="assets/cherry256.png" width="40">
+  </td>
+  <td valign="middle">
+    <h1 tabindex="-1" class="heading-element" dir="auto">CherryTracker</h1>
+  </td>
+</tr>
+</table>
 
 A playback-only Amiga-style module player written in **Red/View**, using
 **[libxmp](https://github.com/libxmp/libxmp)** to decode modules and
