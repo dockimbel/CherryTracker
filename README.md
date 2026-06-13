@@ -1,4 +1,4 @@
-<h1 tabindex="-1" class="heading-element" dir="auto" align="center">
+<h1 tabindex="-1" class="heading-element" dir="auto">
   <img src="assets/cherry256.png" width="40" valign="middle">
   CherryTracker
 </h1>
