@@ -6,7 +6,10 @@ A playback-only Amiga-style module player written in **Red/View**, using
 [FlodPro](https://photonstorm.com/flod-archived-2)-inspired UI is drawn with
 the Red **Draw** dialect in a resizable window.
 
-<img src="assets/tracker-play1.gif" width="200"> <img src="assets/tracker-play2.gif" width="200">
+<p align="center">
+  <img src="assets/tracker-play1.gif" width="400">
+  <img src="assets/tracker-play2.gif" width="400">
+</p>
 
 ## Features
 
