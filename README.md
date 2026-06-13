@@ -53,18 +53,20 @@ in `mods/`.
 
 ## Build
 
+[Download](https://www.red-lang.org/p/download.html) the latest toolchain binary (Automates builds section), rename it to `redc` and drop it in the repo.
+
 Windows:
 ```
-redc.exe -r -s -t Windows -o CherryTracker.exe player.red
+redc -r -s -t Windows -o CherryTracker.exe player.red
 ```
 Linux:
 ```
-redc.exe -r -s -t Linux-GTK -o CherryTracker.exe player.red
+./redc -r -s -t Linux-GTK -o CherryTracker player.red
 ```
 
 Prebuilt statically linked binaries for Windows and Linux available in `builds/`.
 
-x86 dependencies for compilation (prebuilt versions available in `builds/`):
+x86 dependencies for compilation (prebuilt versions available in `libs/`):
 
 - **libxmp** — [upstream](https://github.com/libxmp/libxmp) 
 - **SDL3** — [upstream](https://github.com/libsdl-org/SDL)

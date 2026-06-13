@@ -32,7 +32,7 @@ SDL-AudioSpec!: alias struct! [
 ;--  Imports
 ;-- ============================================================
 #import [
-    "SDL3" cdecl [
+    "libs/SDL3" cdecl [
         SDL_Init:     "SDL_Init"     [ flags [integer!] return: [integer!] ]
         SDL_Quit:     "SDL_Quit"     [ ]
         SDL_GetError: "SDL_GetError" [ return: [c-string!] ]
