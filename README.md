@@ -1,2 +1,79 @@
 # CherryTracker
-An Amiga-style module player written in Red/View
+
+A playback-only Amiga-style module player written in **Red/View**, using
+**[libxmp](https://github.com/libxmp/libxmp)** to decode modules and
+**[SDL3](https://libsdl.org)** for audio output. The whole gray-bevel,
+[FlodPro](https://photonstorm.com/flod-archived-2)-inspired UI is drawn with
+the Red **Draw** dialect in a resizable window.
+
+![screenshot](screenshot.png)
+
+## Features
+
+- Plays **MOD / XM / S3M / IT / …** — every format libxmp supports.
+
+- **Spectrum analyzer** — a real frequency display: 48 log-spaced Goertzel
+  bands (55 Hz–12 kHz) over the Hann-windowed output PCM, colour-by-height
+  bars with slow-falling peak caps.
+
+- **Per-channel VU meters** — smooth gradient bars with fast-attack/slow-decay ballistics and palette-style side bezels. Classic soundtracker look.
+
+- **Scrolling pattern grid** — row gutter, blue PT-style
+  note/instrument/effect columns, highlighted current row.
+
+- **Full transport** — play / pause / stop / loop, position spinners, **seek slider**, master volume.
+
+- **Song info** — name, file + size, tracker type, channels, patterns,
+  instruments, samples, tempo, speed, elapsed / remaining / total time.
+
+- **Sample-accurate audio↔visual sync** — a snapshot FIFO keyed on
+  bytes-played surfaces exactly the frame that is audible right now, so the
+  meters and pattern never lead the sound even with audio buffered ahead.
+
+- **Resizable & maximizable** — drag any edge or maximize; the all-vector UI
+  keeps its 4:3 aspect, scaling crisply and centering with matching gray
+  margins (no stretching, no blur).
+
+## Run
+
+```
+CherryTracker.exe                   # opens; click LOAD to choose a module
+CherryTracker.exe path\to\song.mod  # auto-load and play (also works as "open with")
+```
+
+The shipped `CherryTracker.exe` is the **static release build — fully
+self-contained**, no DLLs needed. A handful of classic modules is included
+in `mods/`.
+
+## Build
+
+Windows:
+```
+redc.exe -r -s -t Windows -o CherryTracker.exe player.red   release (static, self-contained, GUI)
+```
+Linux:
+```
+redc.exe -r -s -t Linux-GTK -o CherryTracker.exe player.red   release (static, self-contained, GUI)
+```
+
+x86 dependencies:
+
+- **libxmp** — [upstream](https://github.com/libxmp/libxmp) 
+- **SDL3** — [upstream](https://github.com/libsdl-org/SDL)
+
+## Layout
+
+| file              | role |
+|-------------------|------|
+| `player.red`      | the app — FFI bindings, `routine!` bridges, snapshot-FIFO sync, the Draw renderer + View loop |
+| `xmp.reds`        | Red/System binding for libxmp (offset-based `xmp_frame_info` / `xmp_module` accessors) |
+| `audio.reds`      | slim SDL3 audio-stream output (manual-feed, S16 / 2ch / 44100) |
+| `cherry.ico`      | application icon (embedded via the Red `Icon:` header field) |
+
+## Credits
+
+- **libxmp** © Claudio Matsuoka & Hipolito Carraro Jr — MIT license.
+- **SDL3** — zlib license.
+- UI layout inspired by **FlodPro** (Christian Corti's Flod replay core,
+  ProTracker interface published by Photon Storm).
+- Test modules courtesy of [The Mod Archive](https://modarchive.org).
