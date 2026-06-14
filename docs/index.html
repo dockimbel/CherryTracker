@@ -111,6 +111,7 @@
   .card .ci{font-size:22px; margin-bottom:10px}
   .card h3{margin:0 0 7px; font-size:17px}
   .card p{margin:0; color:var(--muted); font-size:14.5px}
+  .card.redcard{grid-column:1 / -1; justify-self:center; max-width:360px}
 
   /* ---- formats ---- */
   .formats{text-align:center}
@@ -164,7 +165,7 @@
         <span><span class="lab">Download for</span><span class="big">Linux</span><span class="meta">ELF · 4.5 MB · x86</span></span>
       </a>
     </div>
-    <p class="dlnote">Source &amp; build instructions on <a href="https://github.com/dockimbel/CherryTracker">GitHub</a>. The Windows build is a single self-contained executable — no DLLs, no installer.</p>
+    <p class="dlnote">Source &amp; build instructions on <a href="https://github.com/dockimbel/CherryTracker">GitHub</a>. The Windows build is a single self-contained executable — no DLLs, no installer. New here? Grab some <a href="https://github.com/dockimbel/CherryTracker/tree/master/mods">sample modules</a> to play right away.</p>
   </div>
 </header>
 
@@ -187,7 +188,7 @@
       <div class="card"><div class="ci">&#9654;&#65039;</div><h3>Full transport</h3><p>Play / pause / stop / loop, position spinners, a seek slider and a master volume — every control live.</p></div>
       <div class="card"><div class="ci">&#127916;</div><h3>Sample-accurate sync</h3><p>A snapshot FIFO keyed on bytes-played surfaces exactly the frame you can hear — the meters and pattern never lead the sound.</p></div>
       <div class="card"><div class="ci">&#8505;&#65039;</div><h3>Song info</h3><p>Name, file &amp; size, tracker type, channels, patterns, instruments, samples, tempo, speed and elapsed / remaining / total time.</p></div>
-      <div class="card"><div class="ci">&#127826;</div><h3>Written in Red</h3><p>One compiled <a href="https://www.red-lang.org">Red</a> program — Red/View for the UI, embedded Red/System for the FFI to libxmp and SDL3.</p></div>
+      <div class="card redcard"><div class="ci">&#127826;</div><h3>Written in Red</h3><p>One compiled <a href="https://www.red-lang.org">Red</a> program — Red/View for the UI, embedded Red/System for the FFI to libxmp and SDL3.</p></div>
     </div>
   </div>
 </section>
@@ -201,6 +202,7 @@
       <span class="pill">STM</span><span class="pill">MTM</span><span class="pill">669</span><span class="pill">FAR</span>
       <span class="pill">OKT</span><span class="pill">AMF</span><span class="pill">&amp; more</span>
     </div>
+    <p style="text-align:center; margin-top:28px; color:var(--muted)">No modules on hand? <a href="https://github.com/dockimbel/CherryTracker/tree/master/mods">Browse the bundled <b style="color:var(--ink); font-family:var(--mono)">mods/</b> folder</a> for a few classic tracks to spin.</p>
   </div>
 </section>
 
