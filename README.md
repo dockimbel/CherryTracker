@@ -93,5 +93,6 @@ x86 dependencies for compilation (prebuilt versions available in `libs/`):
 - Test modules courtesy of [The Mod Archive](https://modarchive.org).
 
 ---
-
+<p align="center">
 Made with ❤️ with [Red](https://github.com/red/red) and Claude Code.
+</p>
