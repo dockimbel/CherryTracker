@@ -63,7 +63,10 @@ Linux:
 ```
 ./redc -r -s -t Linux-GTK -o CherryTracker player.red
 ```
-For Linux, ensure that you have the 32-bit dependencies installed (see the bottom of the Download page).
+For Linux, ensure that you have the 32-bit dependencies installed (see the bottom of the Download page). Also if running it from WSL, add the pulseaudio 32-bit lib:
+```
+sudo apt install pulseaudio:i386
+```
 
 Prebuilt statically linked binaries for Windows and Linux available in `builds/`.
 
@@ -88,3 +91,7 @@ x86 dependencies for compilation (prebuilt versions available in `libs/`):
 - UI layout inspired by **FlodPro** (Christian Corti's Flod replay core,
   ProTracker interface published by Photon Storm).
 - Test modules courtesy of [The Mod Archive](https://modarchive.org).
+
+---
+
+Made with ❤️ with [Red](https://github.com/red/red) and Claude Code.
