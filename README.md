@@ -94,5 +94,5 @@ x86 dependencies for compilation (prebuilt versions available in `libs/`):
 
 ---
 <p align="center">
-Made with ❤️ with [Red](https://github.com/red/red) and Claude Code.
+Made with ❤️ with <a href="https://github.com/red/red">Red</a> and Claude Code.
 </p>
