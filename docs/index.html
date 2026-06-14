@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CherryTracker — a retro Amiga-style module player</title>
+<meta name="description" content="CherryTracker is a playback-only Amiga-style music module player (MOD/XM/S3M/IT) with a spectrum analyzer, per-channel VU meters and a scrolling pattern view — written in Red.">
+<meta name="theme-color" content="#0b0d13">
+<link rel="icon" href="favicon.ico" sizes="any">
+<!-- Open Graph / link previews -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="CherryTracker — a retro module player">
+<meta property="og:description" content="MOD / XM / S3M / IT playback with a live spectrum analyzer, gradient VU meters and a scrolling pattern view. Written in Red.">
+<meta property="og:image" content="https://dockimbel.github.io/CherryTracker/screenshot.png">
+<meta property="og:url" content="https://dockimbel.github.io/CherryTracker/">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root{
+    --bg:#0b0d13; --bg2:#0f121a; --panel:#161a24; --panel2:#1b2030;
+    --border:#272d3c; --border2:#343c50;
+    --ink:#e8eaf0; --muted:#9aa2b1; --faint:#6b7384;
+    --cherry:#e85d69; --cherry-d:#a8333f; --cherry-dd:#7e2630;
+    --stem:#a9c45f; --stem-d:#74893c;
+    --note:#7e9cff; --gold:#f6b73e; --wellbg:#0a0c12;
+    --radius:14px;
+    --mono:ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; font-family:var(--sans); color:var(--ink); line-height:1.6;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(232,93,105,.10), transparent 60%),
+      radial-gradient(1000px 500px at 85% 10%, rgba(169,196,95,.08), transparent 55%),
+      linear-gradient(180deg,var(--bg),var(--bg2));
+    background-attachment:fixed;
+  }
+  a{color:var(--note); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1060px; margin:0 auto; padding:0 22px}
+  h1,h2,h3{line-height:1.15; letter-spacing:-.01em}
+  section{padding:64px 0}
+
+  /* ---- nav ---- */
+  nav{position:sticky; top:0; z-index:20; backdrop-filter:blur(10px);
+    background:rgba(11,13,19,.72); border-bottom:1px solid var(--border)}
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:60px}
+  .brand{font-family:var(--mono); font-weight:700; font-size:18px; letter-spacing:-.02em}
+  .brand .n{color:var(--cherry); margin-right:.18em}
+  .brand .c{color:var(--cherry)} .brand .t{color:var(--stem)}
+  .ghbtn{display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:600;
+    color:var(--ink); border:1px solid var(--border2); padding:7px 13px; border-radius:9px;
+    background:var(--panel)}
+  .ghbtn:hover{border-color:var(--cherry); text-decoration:none; background:var(--panel2)}
+  .ghbtn svg{width:18px;height:18px;fill:currentColor}
+
+  /* ---- hero ---- */
+  .hero{position:relative; text-align:center; padding:84px 0 36px; overflow:hidden}
+  .eq{position:absolute; left:0; right:0; bottom:0; height:170px; display:flex; gap:5px;
+    justify-content:center; align-items:flex-end; opacity:.16; pointer-events:none; filter:blur(.3px)}
+  .eq i{width:11px; border-radius:3px 3px 0 0; height:14px;
+    background:linear-gradient(180deg,var(--cherry),var(--gold) 45%,var(--stem));
+    animation:bounce 1.6s ease-in-out infinite}
+  @keyframes bounce{0%,100%{height:14px}50%{height:135px}}
+  @media (prefers-reduced-motion:reduce){.eq i{animation:none; height:60px}}
+  .logo{font-family:var(--mono); font-weight:800; font-size:clamp(40px,9vw,86px);
+    letter-spacing:-.03em; margin:0; position:relative; text-shadow:0 2px 0 rgba(0,0,0,.45)}
+  .logo .note{
+    background:linear-gradient(180deg,#f0727d,var(--cherry-dd));
+    -webkit-background-clip:text; background-clip:text; color:transparent; margin-right:.06em}
+  .logo .cherry{background:linear-gradient(180deg,#f0727d,var(--cherry-dd));
+    -webkit-background-clip:text; background-clip:text; color:transparent}
+  .logo .tracker{background:linear-gradient(180deg,#bcd66f,var(--stem-d));
+    -webkit-background-clip:text; background-clip:text; color:transparent}
+  .tagline{font-size:clamp(17px,2.4vw,22px); color:var(--muted); max-width:640px;
+    margin:18px auto 6px; position:relative}
+  .sub{color:var(--faint); font-size:15px; position:relative}
+  .sub code{font-family:var(--mono); color:var(--note); background:var(--panel); padding:2px 7px; border-radius:6px}
+
+  /* ---- downloads ---- */
+  .dl{display:flex; flex-wrap:wrap; gap:16px; justify-content:center; margin:34px 0 8px; position:relative}
+  .btn{display:flex; align-items:center; gap:14px; text-align:left;
+    padding:15px 22px; border-radius:13px; border:1px solid var(--border2);
+    background:var(--panel); color:var(--ink); min-width:248px; transition:.15s}
+  .btn:hover{text-decoration:none; transform:translateY(-2px); border-color:var(--cherry)}
+  .btn .ico{width:30px; height:30px; flex:none; fill:currentColor; opacity:.95}
+  .btn .lab,.btn .big,.btn .meta{display:block}
+  .btn .lab{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em}
+  .btn .big{font-size:19px; font-weight:700; line-height:1.25; margin:1px 0}
+  .btn .meta{font-size:12px; color:var(--faint); font-family:var(--mono)}
+  .btn.primary{background:linear-gradient(180deg,var(--cherry),var(--cherry-d));
+    border-color:var(--cherry-dd); color:#fff; box-shadow:0 8px 26px rgba(232,93,105,.28)}
+  .btn.primary .lab,.btn.primary .meta{color:rgba(255,255,255,.82)}
+  .btn.secondary{background:linear-gradient(180deg,#2a3220,#1c2417); border-color:var(--stem-d)}
+  .dlnote{color:var(--faint); font-size:13px; margin-top:14px; position:relative}
+
+  /* ---- shot ---- */
+  .shot{margin:8px auto 0; max-width:920px}
+  .frame{border:1px solid var(--border2); border-radius:12px; overflow:hidden;
+    background:#9ea0a6; box-shadow:0 30px 80px rgba(0,0,0,.55); position:relative}
+  .titlebar{height:32px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 0 0 11px; background:linear-gradient(180deg,#eef0f4,#dfe2ea); border-bottom:1px solid #c4c7d2}
+  .titlebar .tt{font-size:12.5px; color:#2b2e36; display:flex; align-items:center; gap:8px}
+  .titlebar .ticon{width:15px; height:15px; display:block; border-radius:2px}
+  .titlebar .wctl{display:flex; align-self:stretch}
+  .titlebar .wb{width:46px; display:flex; align-items:center; justify-content:center; color:#3a3d45; font-size:10px}
+  .titlebar .wb.cl{font-size:12px}
+  .frame img{display:block; width:100%; height:auto}
+
+  /* ---- features ---- */
+  .h2{text-align:center; font-size:clamp(26px,4vw,34px); margin:0 0 6px}
+  .lead{text-align:center; color:var(--muted); max-width:620px; margin:0 auto 38px}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(248px,1fr)); gap:16px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--border);
+    border-radius:var(--radius); padding:22px; transition:.15s}
+  .card:hover{border-color:var(--border2); transform:translateY(-3px)}
+  .card .ci{font-size:22px; margin-bottom:10px}
+  .card h3{margin:0 0 7px; font-size:17px}
+  .card p{margin:0; color:var(--muted); font-size:14.5px}
+
+  /* ---- formats ---- */
+  .formats{text-align:center}
+  .pills{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:8px}
+  .pill{font-family:var(--mono); font-size:14px; font-weight:600; color:var(--note);
+    border:1px solid var(--border2); background:var(--wellbg); padding:8px 16px; border-radius:999px}
+
+  /* ---- band / red ---- */
+  .band{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--border);
+    border-radius:18px; padding:34px; display:flex; gap:26px; align-items:center; flex-wrap:wrap}
+  .band .txt{flex:1 1 320px}
+  .band h2{margin:0 0 8px; font-size:24px}
+  .band p{margin:0; color:var(--muted)}
+  .codeblock{font-family:var(--mono); font-size:13px; background:var(--wellbg); color:#c7cede;
+    border:1px solid var(--border2); border-radius:12px; padding:16px 18px; flex:1 1 320px; overflow:auto}
+  .codeblock .cm{color:var(--faint)} .codeblock . k{color:var(--stem)}
+
+  /* ---- credits / footer ---- */
+  .credits ul{list-style:none; padding:0; margin:0; display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px}
+  .credits li{background:var(--panel); border:1px solid var(--border); border-radius:11px; padding:14px 16px; font-size:14.5px; color:var(--muted)}
+  .credits li b{color:var(--ink); font-weight:650}
+  footer{border-top:1px solid var(--border); padding:30px 0 50px; text-align:center; color:var(--faint); font-size:14px}
+  footer .wrap{display:flex; flex-direction:column; gap:6px; align-items:center}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <span class="brand"><span class="n">&#9836;</span><span class="c">Cherry</span><span class="t">Tracker</span></span>
+  <a class="ghbtn" href="https://github.com/dockimbel/CherryTracker">
+    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    GitHub
+  </a>
+</div></nav>
+
+<header class="hero">
+  <div class="eq" aria-hidden="true" id="eq"></div>
+  <div class="wrap">
+    <h1 class="logo"><span class="note">&#9836;</span><span class="cherry">Cherry</span><span class="tracker">Tracker</span></h1>
+    <p class="tagline">A retro Amiga-style music module player — spectrum analyzer, neon VU meters and a scrolling pattern view, all drawn in&nbsp;<b style="color:var(--ink)">Red</b>.</p>
+    <p class="sub">Plays <code>MOD</code> <code>XM</code> <code>S3M</code> <code>IT</code> &amp; more · self-contained · no install</p>
+
+    <div class="dl">
+      <a class="btn primary" href="https://github.com/dockimbel/CherryTracker/raw/master/builds/windows/CherryTracker.exe">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M3 5.1 10.4 4v7.4H3V5.1Zm0 13.8 7.4 1V12.6H3v6.3ZM11.4 3.9 21 2.6v9.1h-9.6V3.9Zm0 16.2L21 21.4v-8.9h-9.6V20.1Z"/></svg>
+        <span><span class="lab">Download for</span><span class="big">Windows</span><span class="meta">CherryTracker.exe · 4.7 MB · x86</span></span>
+      </a>
+      <a class="btn secondary" href="https://github.com/dockimbel/CherryTracker/raw/master/builds/linux/CherryTracker">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 2c-2 0-3.1 1.6-3.1 3.4 0 1 .4 1.9 1 2.5-.6.3-1.2.9-1.7 1.8-.7-.4-1.3-1.2-1.8-2.1-.2-.5-.8-.6-1.2-.3-.4.3-.5.8-.2 1.2.7 1.2 1.6 2.2 2.6 2.7-.6 1.1-1.1 2.5-1.5 3.8-.7.5-1.4 1.4-1.8 2.8-.4 1.4-.2 2.7.4 3.3.3.3.7.4 1.1.3.3.7 1.1 1.2 2 1.4.6.1 1.2.2 1.9.2h1c.7 0 1.3-.1 1.9-.2.9-.2 1.7-.7 2-1.4.4.1.8 0 1.1-.3.6-.6.8-1.9.4-3.3-.4-1.4-1.1-2.3-1.8-2.8-.4-1.3-.9-2.7-1.5-3.8 1-.5 1.9-1.5 2.6-2.7.3-.4.2-.9-.2-1.2-.4-.3-1-.2-1.2.3-.5.9-1.1 1.7-1.8 2.1-.5-.9-1.1-1.5-1.7-1.8.6-.6 1-1.5 1-2.5C15.1 3.6 14 2 12 2Z"/></svg>
+        <span><span class="lab">Download for</span><span class="big">Linux</span><span class="meta">ELF · 4.5 MB · x86</span></span>
+      </a>
+    </div>
+    <p class="dlnote">Source &amp; build instructions on <a href="https://github.com/dockimbel/CherryTracker">GitHub</a>. The Windows build is a single self-contained executable — no DLLs, no installer.</p>
+  </div>
+</header>
+
+<section style="padding-top:8px">
+  <div class="wrap shot">
+    <div class="frame">
+      <div class="titlebar">
+        <span class="tt"><img class="ticon" src="favicon.ico" alt=""> CherryTracker</span>
+        <span class="wctl"><span class="wb">&#9472;</span><span class="wb">&#9633;</span><span class="wb cl">&#10005;</span></span>
+      </div>
+      <img src="screenshot.png" alt="CherryTracker playing a module: spectrum analyzer, per-channel VU meters and a scrolling pattern view">
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="h2">What's inside</h2>
+    <p class="lead">A faithful tracker UI, drawn entirely with Red's vector Draw dialect — crisp at any size.</p>
+    <div class="grid">
+      <div class="card"><div class="ci">&#128202;</div><h3>Spectrum analyzer</h3><p>A real frequency display — 48 log-spaced Goertzel bands (55&nbsp;Hz–12&nbsp;kHz) over the Hann-windowed output, colour-by-height bars with slow-falling peak caps.</p></div>
+      <div class="card"><div class="ci">&#127897;&#65039;</div><h3>Per-channel VU meters</h3><p>Smooth green&rarr;yellow&rarr;orange&rarr;red gradient bars with fast-attack / slow-decay ballistics and palette-style side bezels.</p></div>
+      <div class="card"><div class="ci">&#127925;</div><h3>Scrolling pattern view</h3><p>Row gutter, blue PT-style note / instrument / effect columns, a centred highlighted row, and up to 64 channels.</p></div>
+      <div class="card"><div class="ci">&#9654;&#65039;</div><h3>Full transport</h3><p>Play / pause / stop / loop, position spinners, a seek slider and a master volume — every control live.</p></div>
+      <div class="card"><div class="ci">&#127916;</div><h3>Sample-accurate sync</h3><p>A snapshot FIFO keyed on bytes-played surfaces exactly the frame you can hear — the meters and pattern never lead the sound.</p></div>
+      <div class="card"><div class="ci">&#8505;&#65039;</div><h3>Song info</h3><p>Name, file &amp; size, tracker type, channels, patterns, instruments, samples, tempo, speed and elapsed / remaining / total time.</p></div>
+      <div class="card"><div class="ci">&#127826;</div><h3>Written in Red</h3><p>One compiled <a href="https://www.red-lang.org">Red</a> program — Red/View for the UI, embedded Red/System for the FFI to libxmp and SDL3.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="formats">
+  <div class="wrap">
+    <h2 class="h2">Every format libxmp plays</h2>
+    <p class="lead">ProTracker and beyond — drop a module in or pass it on the command line.</p>
+    <div class="pills">
+      <span class="pill">MOD</span><span class="pill">XM</span><span class="pill">S3M</span><span class="pill">IT</span>
+      <span class="pill">STM</span><span class="pill">MTM</span><span class="pill">669</span><span class="pill">FAR</span>
+      <span class="pill">OKT</span><span class="pill">AMF</span><span class="pill">&amp; more</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="band">
+      <div class="txt">
+        <h2>Decode &middot; play &middot; draw</h2>
+        <p><b style="color:var(--ink)">libxmp</b> decodes the module, <b style="color:var(--ink)">SDL3</b> plays the PCM, and the whole retro UI is the Red <b style="color:var(--ink)">Draw</b> dialect — a zero-allocation render loop so the GC stays idle at 60&nbsp;fps.</p>
+      </div>
+      <pre class="codeblock"><span class="cm">; build the release (static, self-contained)</span>
+redc.exe <span class="k">-r -s -t</span> Windows <span class="k">-o</span> CherryTracker.exe player.red
+
+<span class="cm">; or just run it</span>
+CherryTracker.exe path\to\song.mod</pre>
+    </div>
+  </div>
+</section>
+
+<section class="credits">
+  <div class="wrap">
+    <h2 class="h2">Credits</h2>
+    <p class="lead">Standing on the shoulders of great open-source work.</p>
+    <ul>
+      <li><b>libxmp</b> — module decoding, &copy; Claudio Matsuoka &amp; Hipolito Carraro Jr (MIT).</li>
+      <li><b>SDL3</b> — audio output (zlib license).</li>
+      <li><b>FlodPro</b> — UI inspiration; Christian Corti's Flod core, ProTracker interface by Photon Storm.</li>
+      <li><b>The Mod Archive</b> — classic modules for testing.</li>
+    </ul>
+  </div>
+</section>
+
+<footer><div class="wrap">
+  <span class="brand"><span class="n">&#9836;</span><span class="c">Cherry</span><span class="t">Tracker</span></span>
+  <span><a href="https://github.com/dockimbel/CherryTracker">Source on GitHub</a> · built with <a href="https://www.red-lang.org">Red</a></span>
+</div></footer>
+
+<script>
+  // decorative equalizer bars (purely cosmetic; page is fine without JS)
+  (function(){
+    var eq=document.getElementById('eq'); if(!eq) return;
+    var n=Math.min(48,Math.max(18,Math.floor(window.innerWidth/26)));
+    for(var i=0;i<n;i++){
+      var b=document.createElement('i');
+      b.style.animationDelay=(-(Math.random()*1.6)).toFixed(2)+'s';
+      b.style.animationDuration=(1.1+Math.random()*1.1).toFixed(2)+'s';
+      eq.appendChild(b);
+    }
+  })();
+</script>
+</body>
+</html>
