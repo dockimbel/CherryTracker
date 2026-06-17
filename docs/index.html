@@ -122,13 +122,14 @@
   /* ---- band / red ---- */
   .band{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--border);
     border-radius:18px; padding:34px; display:flex; gap:26px; align-items:center; flex-wrap:wrap}
-  .band .txt{flex:1 1 320px}
+  .band .txt{flex:1 1 240px}
   .band h2{margin:0 0 8px; font-size:24px}
   .band p{margin:0; color:var(--muted)}
   .codeblock{font-family:var(--mono); font-size:13px; background:var(--wellbg); color:#c7cede;
-    border:1px solid var(--border2); border-radius:12px; padding:16px 18px; flex:1 1 320px;
-    white-space:pre-wrap; overflow-wrap:break-word}
-  .codeblock .cm{color:var(--faint)} .codeblock . k{color:var(--stem)}
+    border:1px solid var(--border2); border-radius:12px; padding:16px 18px; flex:1.5 1 360px;
+    min-width:0; max-width:100%; white-space:pre; overflow:auto}
+  .codeblock .cm{color:var(--faint)} .codeblock .k{color:var(--stem)}
+  @media (max-width:960px){ .band{flex-direction:column; align-items:stretch} }
 
   /* ---- credits / footer ---- */
   .credits ul{list-style:none; padding:0; margin:0; display:grid;
