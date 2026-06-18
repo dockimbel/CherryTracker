@@ -31,6 +31,7 @@ Red [
 
     ;-- flags
     pt-inited?:  no
+    pt-audio?:   no
     pt-opened?:  no
     pt-loaded?:  no
     pt-ended?:   no
@@ -96,10 +97,6 @@ Red [
     pt-rs-init: func [ return: [integer!] /local i [integer!] ][
         pt-ctx: xmp_create_context
         if null? pt-ctx [ return 1 ]
-        ;-- SDL3's C bool return marshals unreliably through R/S (only AL is set);
-        ;-- ignore it and confirm the audio subsystem via the current-driver string
-        SDL_Init SDL-INIT-AUDIO
-        if null? SDL_GetCurrentAudioDriver [ return 2 ]
         pt-fib: allocate XMP-FRAME-INFO-SIZE
         pt-fi:  as xmp-frame-info! pt-fib
         pt-mib: allocate XMP-MODULE-INFO-SIZE
@@ -130,6 +127,15 @@ Red [
         0
     ]
 
+    pt-rs-init-audio: func [ return: [integer!] /local r [integer!] ][
+        if pt-audio? [ return 0 ]
+        r: SDL_Init SDL-INIT-AUDIO
+        if r <> 0 [ return 2 ]
+        if null? SDL_GetCurrentAudioDriver [ return 3 ]
+        pt-audio?: yes
+        0
+    ]
+
     pt-rs-reset-stream: func [][
         if pt-opened? [ SDL_ClearAudioStream pt-strm ]
         pt-total:  0
@@ -152,6 +158,8 @@ Red [
         xmp_get_frame_info pt-ctx (as int-ptr! pt-fib)
         pt-dur: pt-fi/total-time
         if not pt-opened? [
+            r: pt-rs-init-audio
+            if r <> 0 [ return r ]
             pt-spec/format:   SDL-AUDIO-S16
             pt-spec/channels: 2
             pt-spec/freq:     44100
@@ -347,7 +355,13 @@ pt-load-mem: routine [ bin [binary!] return: [integer!] /local p [byte-ptr!] n [
     r: xmp_load_module_from_memory pt-ctx (as int-ptr! p) n
     if r <> 0 [ return r ]
     pt-loaded?: yes
-    pt-rs-open
+    r: pt-rs-open
+    if r <> 0 [
+        xmp_end_player pt-ctx
+        xmp_release_module pt-ctx
+        pt-loaded?: no
+    ]
+    r
 ]
 
 ;-- getters (read the synced snapshot)
@@ -406,7 +420,7 @@ pt-quit: routine [ ][
     if pt-loaded? [ xmp_end_player pt-ctx  xmp_release_module pt-ctx ]
     if not null? pt-ctx [ xmp_free_context pt-ctx ]
     if pt-opened? [ SDL_DestroyAudioStream pt-strm ]
-    SDL_Quit
+    if pt-audio? [ SDL_Quit ]
 ]
 
 ;===============================================================================
@@ -1537,7 +1551,17 @@ load-file: func [f [file!] /local data res][
             vu-level: append/dup make block! 64 0 64
             apply-volume
         ][
-            name-cache: rejoin ["<load error " res ">"]
+            name-cache: either find [2 3 99] res [
+                rejoin ["<audio unavailable " res ">"]
+            ][
+                rejoin ["<load error " res ">"]
+            ]
+            type-cache: either find [2 3] res [
+                "SDL audio initialization failed"
+            ][
+                either res = 99 ["SDL playback device open failed"]["Module load failed"]
+            ]
+            file-line: "Install/start PulseAudio/PipeWire or choose another SDL audio driver"
             loaded?: no
             state: 'idle
         ]
@@ -1666,8 +1690,10 @@ rebuild-prefix: func [sz [pair!]][
 rebuild-prefix face-size
 
 init-rc: pt-init
-unless zero? init-rc [ print ["*** pt-init failed, code=" init-rc] ]
-if zero? init-rc [ fill-spec-coeffs ]
+unless zero? init-rc [
+    cause-error 'user 'message reduce [rejoin ["pt-init failed, code=" init-rc]]
+]
+fill-spec-coeffs
 cli: system/options/args
 if all [ zero? init-rc  block? cli  not empty? cli ][ load-file to-red-file first cli ]
 
