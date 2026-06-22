@@ -1,8 +1,9 @@
 Red [
-	Title:  "CherryTracker — module player"
-	Author: "Nenad Rakocevic"
-	Needs:  'View
-	Icon:   %assets/cherry.ico
+	Title:   "CherryTracker — module player"
+	Author:  "Nenad Rakocevic"
+	Version: 1.0.0
+	Needs:   'View
+	Icon:    %assets/cherry.ico
 ]
 
 ;===============================================================================
@@ -210,7 +211,7 @@ Red [
 
 	;-- Goertzel spectrum: PT-NB band magnitudes(^2) from the last frame's PCM
 	pt-rs-spectrum: func [/local n [integer!] j [integer!] i [integer!] iv [integer!]
-                                  x [float!] s0 [float!] s1 [float!] s2 [float!] cf [float!] m [float!] bufp [byte-ptr!]][
+	                              x [float!] s0 [float!] s1 [float!] s2 [float!] cf [float!] m [float!] bufp [byte-ptr!]][
 		if not pt-opened? [exit]
 		n: pt-fi/buffer-size / 4
 		if n > PT-FFT-N [n: PT-FFT-N]
@@ -385,6 +386,7 @@ pt-songname: routine [return: [string!] /local cs [c-string!]][
 	either null? pt-modp [cs: ""][cs: xmp-mod-name pt-modp]
 	string/load-at cs (length? cs) (as cell! stack/arguments) UTF-8
 ]
+
 pt-modtype: routine [return: [string!] /local cs [c-string!]][
 	either null? pt-modp [cs: ""][cs: xmp-mod-type pt-modp]
 	string/load-at cs (length? cs) (as cell! stack/arguments) UTF-8
@@ -440,16 +442,18 @@ col-cherry-b:  142.38.50          ;-- ... bottom
 col-stem-t:    128.148.66         ;-- wordmark : olive stem green, top
 col-stem-b:     84.104.38         ;-- ... bottom
 
-;-- fonts (sized for the 1024x768 design space)
-fnt-logo: make font! [name: "Consolas" size: 24 style: 'bold]
-fnt-lbl:  make font! [name: "Consolas" size: 13 style: 'bold]
-fnt-val:  make font! [name: "Consolas" size: 15 style: 'bold]
-fnt-btn:  make font! [name: "Consolas" size: 14 style: 'bold]
-fnt-icon: make font! [name: "Segoe UI Symbol" size: 15 style: 'bold]
-fnt-icon-big: make font! [name: "Segoe UI Symbol" size: 20 style: 'bold]   ;-- ↻ renders small : upsize it
-fnt-note: make font! [name: "Segoe UI Symbol" size: 20 style: 'bold]   ;-- 🎶 wordmark flourish : MONOCHROME via Segoe UI Symbol, so it takes the gradient pen (Segoe UI Emoji would force colour)
-fnt-pat:  make font! [name: "Consolas" size: 14]
-fnt-chan: make font! [name: "Consolas" size: 11 style: 'bold]   ;-- CH numbers shrunk for narrow columns (many-channel modules)
+;-- fonts : Consolas (chrome) + Segoe UI Symbol (monochrome glyphs take the gradient pen)
+fnt-mono: make font! [name: "Consolas" style: 'bold]
+fnt-sym:  make font! [name: "Segoe UI Symbol" style: 'bold]
+fnt-logo: make fnt-mono [size: 24]
+fnt-lbl:  make fnt-mono [size: 13]
+fnt-val:  make fnt-mono [size: 15]
+fnt-btn:  make fnt-mono [size: 14]
+fnt-chan: make fnt-mono [size: 11]              ;-- CH numbers : shrunk for narrow columns
+fnt-pat:  make fnt-mono [size: 14 style: none]  ;-- pattern grid : non-bold
+fnt-icon: make fnt-sym [size: 15]
+fnt-icon-big: make fnt-sym [size: 20]           ;-- ↻ renders small : upsize it
+fnt-note: make fnt-sym [size: 20]               ;-- 🎶 wordmark flourish
 
 
 ;-- layout (1024 x 768 design) : every region is an origin + size pair ---------
@@ -457,14 +461,11 @@ win-size: 1024x768
 hd-org:   8x6          ;-- header bar
 hd-size:  1008x44
 pp-org:   8x58         ;-- param panel (left) : 9 rows of label + value box
-pp-size:  348x232
-bt-org:   364x58       ;-- button grid (2 rows x 4 cols)
 btn-size: 158x26
 sp-org:   364x124      ;-- spectrum analyzer
 sp-size:  652x166
 nm-org:   8x298        ;-- 3 name rows : Song / File / Tracker
 nm-size:  1008x84
-nm-rh:    28           ;-- name row stride (row strip is 26 high)
 ch-org:   8x390        ;-- per-channel columns + row gutter
 ch-size:  1008x370
 ;-- param-panel column grid : value cells span x 132..342 (Position cell starts
@@ -479,7 +480,7 @@ spin-l-org: 132x66
 spin-r-org: 152x66
 
 ;-- transport buttons : single source of truth for drawing AND hit-testing
-btns: reduce [
+btns: [
 	"PLAY"  364x58
 	"PAUSE" 528x58
 	"STOP"  692x58
@@ -495,24 +496,16 @@ btn-reserved: ["PREV" "NEXT" "PLAYLIST"]
 SPEC-NB:   48          ;-- must match PT-NB
 SPEC-FMIN: 55.0
 SPEC-FMAX: 12000.0
-;-- display calibration, fitted to measured per-band stats (elekfunk + space_debris,
-;-- 14 s each) : real content slopes ~3 log10 units across the range; HALF-flatten it
-;-- so lows keep dominating and highs only fire on true transients (FlodPro look).
-;-- Floor 0.3 sits above the 8-bit sample noise bed (top-band medians -3..-1 + tilt).
 SPEC-LO:   0.3         ;-- log10(mag^2) display floor
 SPEC-HI:   3.6         ;-- log10(mag^2) display ceiling
 SPEC-TILT: 1.5         ;-- progressive HF boost, log10 units across the range (~ +1.9 dB/oct)
 SPEC-SAMPLES: 512      ;-- analysis window length, must match PT-FFT-N
-SPEC-CAP-HOLD: 30      ;-- peak-cap HOLD : frames the cap stays pinned at a new
-                       ;-- peak before it resumes its (unchanged) fall — ~0.5s
-                       ;-- @60fps; the "lag" of a real peak-hold meter
+SPEC-CAP-HOLD: 30      ;-- frames the peak cap holds before it starts falling (~0.5s @60fps)
 
-;-- spectrum geometry : the dark well hugs the bar field EXACTLY (2px breathing,
-;-- same as the inter-bar gaps) so no leftover black columns appear at the edges;
-;-- the integer-division remainder is absorbed by the surrounding gray chrome
+;-- spectrum geometry : the dark well hugs the bar field with a 2px margin
 spec-bw:   to integer! ((sp-size/x - 20) / SPEC-NB)
 spec-used: (SPEC-NB * spec-bw) - 2
-spec-well: as-pair (sp-org/x + to integer! ((sp-size/x - spec-used) / 2)) (sp-org/y + 10)
+spec-well: as-pair sp-org/x + to integer! ((sp-size/x - spec-used) / 2) sp-org/y + 10
 spec-fh:   sp-size/y - 20
 VU-ATTACK: 33          ;-- VU ballistics : % of the gap eased per frame when rising
 VU-DECAY:  11          ;-- ... and when falling (slow decay = classic pumping meters)
@@ -577,48 +570,52 @@ scratch: make face! [
 	size: 600x60
 	visible?: no
 ]
+
 text-size: func [fnt str /local sz][
 	scratch/font: fnt
 	scratch/text: str
 	sz: attempt [size-text scratch]
 	either sz [sz][0x0]
 ]
+
 ;-- y offset that vertically centers a line box of height `th` in a cell of height `ch`
 cen-y: func [ch th][
 	to integer! ((ch - th) / 2)
 ]
-measure-fonts: does [
-	sz: text-size fnt-logo "00000000"
+
+measure-fonts: func [/local s][
+	s: "00000000"
+	sz: text-size fnt-logo s
 	if sz/x > 0 [
 		aw-logo: sz/x / 8.0
 		th-logo: sz/y
 	]
-	sz: text-size fnt-val "00000000"
+	sz: text-size fnt-val s
 	if sz/x > 0 [
 		aw-val: sz/x / 8.0
 		th-val: sz/y
 	]
-	sz: text-size fnt-lbl "00000000"
+	sz: text-size fnt-lbl s
 	if sz/x > 0 [
 		aw-lbl: sz/x / 8.0
 		th-lbl: sz/y
 	]
-	sz: text-size fnt-btn "00000000"
+	sz: text-size fnt-btn s
 	if sz/x > 0 [
 		aw-btn: sz/x / 8.0
 		th-btn: sz/y
 	]
-	sz: text-size fnt-pat "00000000"
+	sz: text-size fnt-pat s
 	if sz/x > 0 [
 		aw-pat: sz/x / 8.0
 		th-pat: sz/y
 	]
-	sz: text-size fnt-chan "00000000"
+	sz: text-size fnt-chan s
 	if sz/x > 0 [aw-chan: sz/x / 8.0]
 	;-- derive the time-cell + seek-groove geometry from the real glyph width
 	tb-w: 16 + to integer! (aw-val * 6)
 	tb-x: nm-org/x + nm-size/x - 8 - tb-w
-	seek-size: as-pair (tb-x - 12 - seek-org/x) seek-size/y
+	seek-size: as-pair tb-x - 12 - seek-org/x seek-size/y
 ]
 
 ;-- helpers --------------------------------------------------------------------
@@ -633,6 +630,7 @@ hex2: func [v /local hi lo][
 	lo: v - (hi * 16)
 	rejoin [HEXD/(hi + 1) HEXD/(lo + 1)]
 ]
+
 note-name: func [n /local oct idx][
 	case [
 		n = 0    ["..."]
@@ -644,6 +642,7 @@ note-name: func [n /local oct idx][
 		]
 	]
 ]
+
 fx-type: func [t][either all [t >= 0  t <= 35] [FXCH/(t + 1)][#"?"]]
 
 ;-- append-into formatters : fill a reused buffer in place, no allocation
@@ -651,6 +650,7 @@ pad2-into: func [buf n][
 	if n < 10 [append buf #"0"]
 	append buf n
 ]
+
 pad3-into: func [buf n][
 	either n < 0 [append buf "000"][
 		if n < 100 [append buf #"0"]
@@ -658,6 +658,7 @@ pad3-into: func [buf n][
 		append buf n
 	]
 ]
+
 fmt-time-into: func [buf ms /local s m][
 	if ms < 0 [ms: 0]
 	s: to integer! (ms / 1000)
@@ -668,10 +669,17 @@ fmt-time-into: func [buf ms /local s m][
 	pad2-into buf s
 ]
 
-;-- precomputed string tables : every string the pattern grid can show, built
-;-- once; the render loop only references them
+;-- string tables + state tags (the note/hex/row/channel tables are filled by `init`)
 note-strs: make block! 128
-repeat n 127 [append note-strs note-name n]
+hex-strs:  make block! 256
+row-strs:  make block! 256
+chw-strs:  make block! 64
+chn-strs:  make block! 64
+cell-pool: make block! 64          ;-- pattern-cell buffers, grown on demand
+state-tags: [idle "IDLE" playing "PLAYING" paused "PAUSED" draining "DRAINING" winddown "WINDDOWN"]
+;-- one series per dynamic text cell (declared so compiled mode sees the globals; filled by `init`)
+pos-buf: pat-buf: npat-buf: chn-buf: inb-buf: smp-buf: bpm-buf: spd-buf: vol-buf: el-buf: rem-buf: tot-buf: none
+
 note-str: func [n][
 	case [
 		n = 0    ["..."]
@@ -679,44 +687,33 @@ note-str: func [n][
 		true     [note-strs/(n)]
 	]
 ]
-hex-strs: make block! 256
-repeat v 256 [append hex-strs hex2 v - 1]
-hex-str: func [v][either all [v >= 0  v < 256][hex-strs/(v + 1)][hex-strs/1]]
-row-strs: make block! 256
-repeat r 256 [append row-strs pad2 r - 1]
-row-str: func [r][either all [r >= 0  r < 256][row-strs/(r + 1)][pad2 r]]
-chw-strs: make block! 64
-chn-strs: make block! 64
-repeat c 64 [
-	append chw-strs rejoin ["CH" c]
-	append chn-strs form c
-]
-state-tags: [idle "IDLE" playing "PLAYING" paused "PAUSED" draining "DRAINING" winddown "WINDDOWN"]
 
-;-- reused per-slot text buffers : each dynamic text cell needs its OWN series
-;-- (the frame block holds references; clear + refill changes what it shows)
-pos-buf:  make string! 12
-pat-buf:  make string! 8
-npat-buf: make string! 8
-chn-buf:  make string! 8
-inb-buf:  make string! 8
-smp-buf:  make string! 8
-bpm-buf:  make string! 8
-spd-buf:  make string! 8
-vol-buf:  make string! 8
-el-buf:   make string! 8
-rem-buf:  make string! 8
-tot-buf:  make string! 8
-;-- pattern-cell buffers, one per visible cell, grown on demand and reused
-cell-pool: make block! 64
+hex-str: func [v][either all [v >= 0  v < 256][hex-strs/(v + 1)][hex-strs/1]]
+row-str: func [r][either all [r >= 0  r < 256][row-strs/(r + 1)][pad2 r]]
+
 cell-buf: func [i][
 	while [i > length? cell-pool][append/only cell-pool make string! 12]
 	clear cell-pool/(i)
 ]
 
+;-- fill the string tables + allocate the per-slot text buffers (each dynamic text
+;-- cell needs its OWN series). Called once at startup.
+init: does [
+	repeat n 127 [append note-strs note-name n]
+	repeat v 256 [append hex-strs hex2 v - 1]
+	repeat r 256 [append row-strs pad2 r - 1]
+	repeat c 64 [
+		append chw-strs rejoin ["CH" c]
+		append chn-strs form c
+	]
+	foreach [buf size] [
+		pos-buf 12  pat-buf 8  npat-buf 8  chn-buf 8  inb-buf 8  smp-buf 8
+		bpm-buf 8   spd-buf 8  vol-buf 8   el-buf 8   rem-buf 8   tot-buf 8
+	][set buf make string! size]
+]
+
 ;-- every emit-* helper APPENDS its draw code into `out` (compose/into writes
 ;-- straight into the frame block : no intermediate block is ever allocated)
-;-- a raised beveled panel
 emit-bevel: func [out org size face lt dk /local tr bl br][
 	tr: org + (size * 1x0)
 	bl: org + (size * 0x1)
@@ -727,7 +724,7 @@ emit-bevel: func [out org size face lt dk /local tr bl br][
 		pen (dk) line (bl) (br) line (tr) (br)
 	] tail out
 ]
-;-- a sunken near-black data box (dark edge top/left, light bottom/right)
+
 emit-sunken: func [out org size /local tr bl br][
 	tr: org + (size * 1x0)
 	bl: org + (size * 0x1)
@@ -738,26 +735,28 @@ emit-sunken: func [out org size /local tr bl br][
 		pen (col-bevel-lt) line (bl) (br) line (tr) (br)
 	] tail out
 ]
-;-- a sunken strip of chrome (no dark fill) -> the FlodPro name rows + cells
+
 emit-sunken-strip: func [out org size][
 	emit-bevel out org size col-bg col-bevel-dk col-bevel-lt
 ]
-;-- a sunken GRAY value cell with dark data text (FlodPro style)
+
 emit-val-box: func [out org size txt][
 	emit-sunken-strip out org size
 	compose/into [
-		pen (col-ink) font fnt-val text (as-pair (org/x + 6) (org/y + cen-y size/y th-val)) (txt)
+		pen (col-ink) font fnt-val text (as-pair org/x + 6 org/y + cen-y size/y th-val) (txt)
 	] tail out
 ]
-;-- same, text right-aligned inside the cell (times, volume %)
+
+;-- right-aligned variant of emit-val-box
 emit-val-box-r: func [out org size txt /local tx][
 	tx: org/x + size/x - 7 - (to integer! (aw-val * length? txt))
 	emit-sunken-strip out org size
 	compose/into [
-		pen (col-ink) font fnt-val text (as-pair tx (org/y + cen-y size/y th-val)) (txt)
+		pen (col-ink) font fnt-val text (as-pair tx org/y + cen-y size/y th-val) (txt)
 	] tail out
 ]
-;-- a white label with a 1x1 dark drop shadow (font must be set by the caller)
+
+;-- white label + drop shadow (caller sets the font)
 emit-lbl-text: func [out pos txt][
 	compose/into [
 		pen (0.0.0.150)
@@ -766,9 +765,8 @@ emit-lbl-text: func [out pos txt][
 		text (pos) (txt)
 	] tail out
 ]
-;-- a push-button : mode = 'up | 'dn (pressed / engaged) | 'dis (disabled)
-;-- FlodPro look : gray face, fine bezel, WHITE label enabled / dark label disabled;
-;-- pressed inverts the bezel, darkens the face and nudges the label +1x1
+
+;-- mode = 'up | 'dn (pressed) | 'dis (disabled)
 emit-btn: func [out org size lbl mode /local lx ly][
 	either mode = 'dn [
 		emit-bevel out org size col-face-dn col-bevel-dk col-bevel-lt
@@ -790,15 +788,13 @@ emit-btn: func [out org size lbl mode /local lx ly][
 		emit-lbl-text out (org + (as-pair lx ly)) lbl
 	]
 ]
-;-- a push-button with a unicode transport icon (standard media symbols),
-;-- centred from its measured glyph size, black enabled / dim disabled
 icon-glyphs: ["PLAY" "▶" "PAUSE" "❚❚" "STOP" "■" "LOOP" "↻"]
-icon-ink: copy []                ;-- glyph -> ink-top + ink-bottom (for true centring)
-icon-szs: copy []                ;-- glyph -> measured size (the frame loop must not call size-text)
+icon-ink: make block! 8                ;-- glyph -> ink-top + ink-bottom (for true centring)
+icon-szs: make block! 8                ;-- glyph -> measured size (the frame loop must not call size-text)
 
 ;-- symbol glyphs sit unpredictably inside their em box (the ↻ ink rides low),
 ;-- so render each one offscreen ONCE and record its real vertical ink bounds
-measure-icon-inks: function [] [
+measure-icon-inks: function [][
 	clear icon-ink
 	clear icon-szs
 	foreach [lbl gl] icon-glyphs [
@@ -827,9 +823,10 @@ measure-icon-inks: function [] [
 				bot: y - 1
 			]
 		]
-		if top [append icon-ink reduce [gl  top + bot]]
+		if top [repend icon-ink [gl  top + bot]]
 	]
 ]
+
 emit-btn-glyph: func [out org size gl mode /local icol sz lx ly fname oy][
 	either mode = 'dn [
 		emit-bevel out org size col-face-dn col-bevel-dk col-bevel-lt
@@ -854,50 +851,40 @@ emit-btn-glyph: func [out org size gl mode /local icol sz lx ly fname oy][
 	] tail out
 ]
 
-;-- a slider : sunken groove + raised square thumb at `frac` (0.0 .. 1.0)
 emit-slider: func [out org size frac /local tx][
 	if frac < 0.0 [frac: 0.0]
 	if frac > 1.0 [frac: 1.0]
 	tx: org/x + 1 + to integer! ((size/x - 12) * frac)
 	emit-sunken out org size
-	emit-bevel out (as-pair tx (org/y - 3)) (as-pair 10 (size/y + 6)) col-bg col-bevel-lt col-bevel-dk
+	emit-bevel out (as-pair tx org/y - 3) (as-pair 10 size/y + 6) col-bg col-bevel-lt col-bevel-dk
 ]
-;-- a spectrum bar, matched to the original : colour runs green->yellow->orange->
-;-- red by ABSOLUTE height with a glossy gradient; the unlit part stays as a dim
-;-- "ghost" of the same gradient (background bars); the peak cap is coloured by
-;-- its own Y position.  `org`/`size` = the full bar cell, `litpx`/`pk` in px.
+
+;-- colour follows ABSOLUTE bar height (not fill ratio); org/size = bar cell, litpx/pk in px
 emit-grad-bar: func [out org size litpx pk /local br by ltop pky][
 	br: org + size
 	by: br/y
 	ltop: by - litpx
 	compose/into [
 		pen off
-		;-- full-height colour gradient : green(low) -> yellow -> orange -> red(high)
 		fill-pen linear (col-vu-green) 0.0 (col-vu-yellow) 0.5 (col-vu-orange) 0.76 (col-vu-red) 1.0 (as-pair org/x by) (org)
 		box (org) (br)
-		;-- faint edge shading (NB Red tuple alpha = TRANSPARENCY : 0 opaque, 255 clear)
 		fill-pen linear (0.0.0.195) 0.0 (0.0.0.255) 0.5 (0.0.0.185) 1.0 (org) (as-pair br/x org/y)
 		box (org) (br)
-		;-- dim everything above the level -> a faint ghost of the bar behind
+		;-- ghost of the bar above the level
 		fill-pen 0.0.0.52
 		box (org) (as-pair br/x ltop)
 	] tail out
-	;-- peak cap, coloured by its own height (same gradient, full brightness)
 	if pk > 2 [
 		pky: by - pk
 		compose/into [
 			fill-pen linear (col-vu-green) 0.0 (col-vu-yellow) 0.5 (col-vu-orange) 0.76 (col-vu-red) 1.0 (as-pair org/x by) (org)
-			box (as-pair org/x (pky - 2)) (as-pair br/x (pky + 1))
+			box (as-pair org/x pky - 2) (as-pair br/x pky + 1)
 		] tail out
 	]
 ]
-;-- a VU meter, matched to the original trackers : the lit bar sits in a thin
-;-- near-black recessed frame; its colour runs green->yellow->orange->red by
-;-- ABSOLUTE height; and a glossy glass-tube bezel (bright highlight toward the
-;-- left, shadow on the right) is painted ON the bar so it moves with the level.
-;-- the lit bar ONLY — its black well is drawn in emit-chan-notes, UNDER the
-;-- row highlight, so the highlight band runs unbroken across idle meters while
-;-- an active bar crosses it brightly on top
+
+;-- VU meter : green→red by absolute height, glossy bezel painted on the bar. Draws the
+;-- lit bar ONLY — the black well is in emit-chan-notes, under the row highlight.
 emit-vu-bar: func [out org size litpx /local br by bx0 bx1 ltop lw rw][
 	br:  org + size
 	by:  br/y
@@ -911,40 +898,34 @@ emit-vu-bar: func [out org size litpx /local br by bx0 bx1 ltop lw rw][
 		ltop: by - litpx
 		compose/into [
 			pen off
-			;-- level colour by absolute height : green(low) -> yellow -> orange -> red(high)
 			fill-pen linear (col-vu-green) 0.0 (col-vu-yellow) 0.5 (col-vu-orange) 0.76 (col-vu-red) 1.0 (as-pair bx0 by) (as-pair bx0 org/y)
 			box (as-pair bx0 ltop) (as-pair bx1 by)
-			;-- bezel as FLAT hard-edged bands, like the palette-drawn originals :
-			;-- lighter strip on the left, darker strip on the right
-			;-- (NB Red tuple alpha = TRANSPARENCY : 0 opaque, 255 clear)
 			fill-pen 255.255.255.165
-			box (as-pair bx0 ltop) (as-pair (bx0 + lw) by)
+			box (as-pair bx0 ltop) (as-pair bx0 + lw by)
 			fill-pen 0.0.0.150
-			box (as-pair (bx1 - rw) ltop) (as-pair bx1 by)
+			box (as-pair bx1 - rw ltop) (as-pair bx1 by)
 		] tail out
 	]
 ]
 
 ;-- static chrome (panels, frames, static labels, logo, wordmark) -------------
-build-chrome: function [] [
+build-chrome: function [][
 	out: make block! 400
 	compose/into [pen off fill-pen (col-bg) box 0x0 (win-size)] tail out
-	;-- header + wordmark (the 🎵/🎶 flourishes replace the old cherry bitmap)
 	emit-bevel out hd-org hd-size col-bg col-bevel-lt col-bevel-dk
 	;-- (the wordmark is drawn by build-wordmark, appended LAST in render :
 	;--  this Draw build has no shadow reset, so the shadow must trail the frame)
 	;-- param panel + row labels, centered on their value cells (cells at ry-2, 20 high)
-	emit-bevel out pp-org pp-size col-bg col-bevel-lt col-bevel-dk
+	emit-bevel out pp-org 348x232 col-bg col-bevel-lt col-bevel-dk
 	append out [font fnt-lbl]
 	ry: pp-org/y + 10
 	foreach lbl ["Position" "Pattern" "Patterns" "Channels" "Instruments" "Samples" "Tempo" "Speed" "Volume"][
-		emit-lbl-text out (as-pair (pp-org/x + 12) (ry - 2 + cen-y 20 th-lbl)) lbl
+		emit-lbl-text out (as-pair pp-org/x + 12 ry - 2 + cen-y 20 th-lbl) lbl
 		ry: ry + 24
 	]
-	;-- spectrum panel (frame + a sunken well sized exactly to the bar field;
-	;-- the analyzer itself is FINAL)
+	;-- spectrum panel : frame + well
 	emit-bevel out sp-org sp-size col-bg col-bevel-lt col-bevel-dk
-	emit-sunken out (spec-well - 2x2) (as-pair (spec-used + 4) (spec-fh + 4))
+	emit-sunken out (spec-well - 2x2) (as-pair spec-used + 4 spec-fh + 4)
 	;-- the 3 name rows : sunken strips + WHITE right-aligned labels
 	emit-sunken-strip out (nm-org + 0x0)  (as-pair nm-size/x 26)
 	emit-sunken-strip out (nm-org + 0x28) (as-pair nm-size/x 26)
@@ -952,9 +933,9 @@ build-chrome: function [] [
 	lbx: nm-org/x + 100
 	lby: cen-y 26 th-lbl
 	append out [font fnt-lbl]
-	emit-lbl-text out (as-pair (lbx - to integer! (aw-lbl * 5)) (nm-org/y + lby))      "Song:"
-	emit-lbl-text out (as-pair (lbx - to integer! (aw-lbl * 5)) (nm-org/y + 28 + lby)) "File:"
-	emit-lbl-text out (as-pair (lbx - to integer! (aw-lbl * 8)) (nm-org/y + 56 + lby)) "Tracker:"
+	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + lby)      "Song:"
+	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + 28 + lby) "File:"
+	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 8) nm-org/y + 56 + lby) "Tracker:"
 	;-- channels panel
 	emit-bevel out ch-org ch-size col-bg col-bevel-lt col-bevel-dk
 	emit-sunken out (ch-org + 6x6) (ch-size - 12x12)
@@ -982,18 +963,16 @@ ink-bounds: function [fword str /local img top bot c inked?][
 	either top [reduce [top bot]][reduce [0 0]]
 ]
 
-;-- the wordmark : 🎶 + "Cherry" (cherry-red) and "Tracker" (stem-green, no tail note),
-;-- each glyph vertically shaded by a gradient pen (gradient pens fill text AND
-;-- the monochrome Segoe notes).  Drop shadow EMULATED by an offset translucent
-;-- dark pass underneath — Draw `shadow` parses but renders NOTHING here (GDI+),
-;-- verified offscreen.  Built once at first tick (advances + note inks measured).
-build-wordmark: function [] [
+;-- the wordmark : 🎶 + "Cherry" (cherry-red) + "Tracker" (stem-green), each glyph
+;-- shaded by a gradient pen (fills text AND the monochrome Segoe notes).  Drop shadow
+;-- EMULATED by an offset dark pass — Draw `shadow` renders nothing on GDI+.
+build-wordmark: function [][
 	out: make block! 64
 	;-- exact advances via the measurement-DIFFERENCE trick (constant padding cancels)
 	cadv: (text-size fnt-logo "CherryCherry") - (text-size fnt-logo "Cherry")
 	nadv: (text-size fnt-note "🎶🎶")         - (text-size fnt-note "🎶")   ;-- leading 🎶 advance
 	gap: 8
-	ex:  hd-org/x + 14                          ;-- leading 🎶 where the cherry bitmap sat
+	ex:  hd-org/x + 14                          ;-- leading 🎶 position
 	cx:  ex + nadv/x + gap                       ;-- "Cherry" after the note
 	tx:  cx + cadv/x                             ;-- "Tracker" abuts "Cherry" like one word
 	ly:  hd-org/y + cen-y hd-size/y th-logo
@@ -1008,13 +987,13 @@ build-wordmark: function [] [
 		;-- shadow pass (1px offset, translucent dark) for every glyph
 		font fnt-note
 		pen (0.0.0.150)
-		text (as-pair (ex + 1) (bey + 1)) "🎶"
+		text (as-pair ex + 1 bey + 1) "🎶"
 		font fnt-logo
-		text (as-pair (cx + 1) (ly + 1)) "Cherry"
-		text (as-pair (tx + 1) (ly + 1)) "Tracker"
+		text (as-pair cx + 1 ly + 1) "Cherry"
+		text (as-pair tx + 1 ly + 1) "Tracker"
 		;-- 🎶 + Cherry : cherry-red vertical gradient
 		font fnt-note
-		pen linear (col-cherry-t) 0.0 (col-cherry-b) 1.0 (as-pair ex (bey + nb/1)) (as-pair ex (bey + nb/2))
+		pen linear (col-cherry-t) 0.0 (col-cherry-b) 1.0 (as-pair ex bey + nb/1) (as-pair ex bey + nb/2)
 		text (as-pair ex bey) "🎶"
 		font fnt-logo
 		pen linear (col-cherry-t) 0.0 (col-cherry-b) 1.0 (as-pair cx gy0) (as-pair cx gy1)
@@ -1045,40 +1024,40 @@ emit-params: function [out][
 	pad3-into pos-buf pt-pos
 	append pos-buf " / "
 	pad3-into pos-buf pt-len
-	emit-val-box out (as-pair (pp-org/x + 168) (ry - 2)) 166x20 pos-buf
+	emit-val-box out (as-pair pp-org/x + 168 ry - 2) 166x20 pos-buf
 	ry: ry + 24
 	clear pat-buf
 	pad3-into pat-buf pt-pattern
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 pat-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 pat-buf
 	ry: ry + 24
 	clear npat-buf
 	pad3-into npat-buf pt-npat
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 npat-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 npat-buf
 	ry: ry + 24
 	clear chn-buf
 	pad2-into chn-buf pt-channels
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 chn-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 chn-buf
 	ry: ry + 24
 	clear inb-buf
 	pad2-into inb-buf pt-ins
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 inb-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 inb-buf
 	ry: ry + 24
 	clear smp-buf
 	pad2-into smp-buf pt-smp
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 smp-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 smp-buf
 	ry: ry + 24
 	clear bpm-buf
 	pad3-into bpm-buf pt-bpm
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 bpm-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 bpm-buf
 	ry: ry + 24
 	clear spd-buf
 	pad2-into spd-buf pt-speed
-	emit-val-box out (as-pair vbx (ry - 2)) 210x20 spd-buf
+	emit-val-box out (as-pair vbx ry - 2) 210x20 spd-buf
 	;-- Volume row : slider + value cell
 	emit-slider out vol-org vol-size (volume / 100.0)
 	clear vol-buf
 	append vol-buf volume
-	emit-val-box-r out (as-pair (vol-org/x + vol-size/x + 8) (vol-org/y - 4)) 44x20 vol-buf
+	emit-val-box-r out (as-pair vol-org/x + vol-size/x + 8 vol-org/y - 4) 44x20 vol-buf
 ]
 
 ;-- dynamic: transport buttons (mode reflects state, press + disabled)
@@ -1140,9 +1119,7 @@ emit-spectrum: function [out][
 			if lvl < target [lvl: target]
 		]
 		spec-level/(b + 1): lvl
-		;-- peak cap : jumps to a new peak, HOLDS there for a moment, then
-		;-- resumes the same slow fall — classic peak-hold ballistics (the hold
-		;-- is the lag; the fall rate is unchanged)
+		;-- peak cap : hold at a new peak, then fall
 		pk: spec-peak/(b + 1)
 		either lvl >= pk [
 			pk: lvl                                       ;-- new peak : pin it +
@@ -1156,7 +1133,7 @@ emit-spectrum: function [out][
 		]
 		if pk < 0 [pk: 0]
 		spec-peak/(b + 1): pk
-		emit-grad-bar out (iorg + (as-pair (b * bw) 0)) (as-pair barw spec-fh) lvl pk
+		emit-grad-bar out (iorg + (as-pair b * bw 0)) (as-pair barw spec-fh) lvl pk
 		b: b + 1
 	]
 ]
@@ -1168,41 +1145,34 @@ emit-names: function [out][
 	tot: pt-duration
 	el: either find [playing paused draining] state [pt-time-ms][0]
 	if el > tot [el: tot]
-	;-- values (dark data text on the gray strips, centered on the 26-high rows)
 	vy: cen-y 26 th-val
 	compose/into [pen (col-ink) font fnt-val
-		text (as-pair (nm-org/x + 108) (nm-org/y + vy))      (name-cache)
-		text (as-pair (nm-org/x + 108) (nm-org/y + 28 + vy)) (file-line)
-		text (as-pair (nm-org/x + 108) (nm-org/y + 56 + vy)) (type-cache)
+		text (as-pair nm-org/x + 108 nm-org/y + vy)      (name-cache)
+		text (as-pair nm-org/x + 108 nm-org/y + 28 + vy) (file-line)
+		text (as-pair nm-org/x + 108 nm-org/y + 56 + vy) (type-cache)
 	] tail out
-	;-- seek slider (Song row) + time cells : elapsed / -remaining / total.
-	;-- quantize to whole seconds ONCE and derive both from it, so the two
-	;-- cells flip in the same frame (raw tot-el flips at a phase offset of
-	;-- tot//1000 -> the cells looked ~0.5s out of step)
+	;-- quantize to whole seconds ONCE so both time cells flip in the same frame
 	frac: either tot > 0 [(1.0 * el) / tot][0.0]
 	emit-slider out seek-org seek-size frac
 	els:  to integer! (el / 1000)
 	tots: to integer! (tot / 1000)
 	clear el-buf
 	fmt-time-into el-buf (1000 * els)
-	emit-val-box-r out (as-pair tb-x (nm-org/y + 3))  (as-pair tb-w 20) el-buf
+	emit-val-box-r out (as-pair tb-x nm-org/y + 3)  (as-pair tb-w 20) el-buf
 	clear rem-buf
 	append rem-buf #"-"
 	fmt-time-into rem-buf (1000 * (tots - els))
-	emit-val-box-r out (as-pair tb-x (nm-org/y + 31)) (as-pair tb-w 20) rem-buf
+	emit-val-box-r out (as-pair tb-x nm-org/y + 31) (as-pair tb-w 20) rem-buf
 	clear tot-buf
 	fmt-time-into tot-buf (1000 * tots)
-	emit-val-box-r out (as-pair tb-x (nm-org/y + 59)) (as-pair tb-w 20) tot-buf
+	emit-val-box-r out (as-pair tb-x nm-org/y + 59) (as-pair tb-w 20) tot-buf
 	;-- header state tag, right-aligned + centered
 	stag: select state-tags state
 	append out [font fnt-lbl]
-	emit-lbl-text out (as-pair (hd-org/x + hd-size/x - 14 - to integer! (aw-lbl * length? stag)) (hd-org/y + cen-y hd-size/y th-lbl)) stag
+	emit-lbl-text out (as-pair hd-org/x + hd-size/x - 14 - to integer! (aw-lbl * length? stag) hd-org/y + cen-y hd-size/y th-lbl) stag
 ]
 
-;-- per-channel note columns + row gutter + dividers + CH labels
-;-- (cached on view-pat/view-row/nch change; view-* may be virtual during
-;-- winddown.  every string comes from the precomputed tables or the reused
-;-- cell-pool buffers — a rebuild allocates nothing)
+;-- cached on view-pat/view-row/nch change; view-* may be virtual during winddown
 emit-chan-notes: function [out][
 	nch: pt-channels
 	if nch <= 0 [nch: 4]
@@ -1231,7 +1201,7 @@ emit-chan-notes: function [out][
 	c: 0
 	while [c < nch][
 		cx: cc-x + (c * colw) + 4
-		compose/into [pen off fill-pen (col-vu-well) box (as-pair cx vutop) (as-pair (cx + vuw) (vutop + vuh))] tail out
+		compose/into [pen off fill-pen (col-vu-well) box (as-pair cx vutop) (as-pair cx + vuw vutop + vuh)] tail out
 		c: c + 1
 	]
 	;-- dividers + CH labels (narrow columns : bare number, centred, so the
@@ -1239,7 +1209,7 @@ emit-chan-notes: function [out][
 	c: 0
 	while [c < nch][
 		cx: cc-x + (c * colw)
-		if c > 0 [compose/into [pen (col-data-edge) line (as-pair cx (ch-org/y + 8)) (as-pair cx (ch-org/y + ch-size/y - 8))] tail out]
+		if c > 0 [compose/into [pen (col-data-edge) line (as-pair cx ch-org/y + 8) (as-pair cx ch-org/y + ch-size/y - 8)] tail out]
 		either colw >= 70 [
 			lbl:   chw-strs/(c + 1)
 			lx:    cx + notex
@@ -1256,7 +1226,7 @@ emit-chan-notes: function [out][
 			]
 			lx: cx + to integer! ((colw - (aw * length? lbl)) / 2)
 		]
-		compose/into [pen (col-white) font (fname) text (as-pair lx (ch-org/y + 8)) (lbl)] tail out
+		compose/into [pen (col-white) font (fname) text (as-pair lx ch-org/y + 8) (lbl)] tail out
 		c: c + 1
 	]
 	if all [nrows > 0  cpat >= 0][
@@ -1266,13 +1236,10 @@ emit-chan-notes: function [out][
 			rr: crow + i
 			cy: (ch-org/y + 28) + ((i + half) * rh)
 			if all [rr >= 0  rr < nrows][
-				;-- highlight band nudged +2px : the fnt-pat line box leads high, so
-				;-- its ink rides low in the box — measured 6px gap above / 2px below,
-				;-- this re-centres the text ink top-to-bottom in the band
-				if i = 0 [compose/into [pen off fill-pen (col-row-hi-bg) box (as-pair (ch-org/x + 8) (cy + 1)) (as-pair (ch-org/x + ch-size/x - 8) (cy + rh + 1))] tail out]
+				;-- +1px : the fnt-pat ink rides low in its line box, re-centred in the band
+				if i = 0 [compose/into [pen off fill-pen (col-row-hi-bg) box (as-pair ch-org/x + 8 cy + 1) (as-pair ch-org/x + ch-size/x - 8 cy + rh + 1)] tail out]
 				txcol: either i = 0 [col-row-hi-tx][col-note]
-				;-- row number in the left gutter
-				compose/into [pen (txcol) font fnt-pat text (as-pair (ch-org/x + 14) cy) (row-str rr)] tail out
+				compose/into [pen (txcol) font fnt-pat text (as-pair ch-org/x + 14 cy) (row-str rr)] tail out
 				if shownotes? [
 					c: 0
 					while [c < nch][
@@ -1341,10 +1308,9 @@ emit-chan-vu: function [out][
 	]
 ]
 
-;-- assemble all layers into the ONE persistent frame block (it IS canvas/draw,
-;-- installed once at startup).  clear keeps the allocated capacity and every
-;-- emitted value is an immediate or a reused series reference, so after
-;-- warm-up a frame allocates NOTHING and the GC stays idle (Rednoid pattern).
+;-- assemble all layers into the ONE persistent frame block (it IS canvas/draw).
+;-- clear keeps capacity; every emitted value is immediate or a reused reference,
+;-- so a warm frame allocates NOTHING.
 render: does [
 	clear frame-tail                        ;-- keep the anti-alias/scale prefix
 	append frame-blk chrome-block
@@ -1366,8 +1332,7 @@ render: does [
 ]
 
 ;-- state transitions ----------------------------------------------------------
-;-- rewind + silence + zero the visual sources; bars then EASE down and the
-;-- rows scroll out of view (see tick) before the player goes idle
+;-- rewind + silence; bars ease down + rows scroll out before idle (see tick-frame)
 enter-winddown: does [
 	pt-restart
 	pt-clear-state
@@ -1425,6 +1390,7 @@ do-action: func [lbl][
 ]
 
 apply-volume: does [pt-set-gain (volume / 100.0)]
+
 set-vol-from-x: func [dx [integer!] /local v][
 	v: to integer! ((dx - vol-org/x) * 100 / vol-size/x)
 	if v < 0 [v: 0]
@@ -1432,6 +1398,7 @@ set-vol-from-x: func [dx [integer!] /local v][
 	volume: v
 	apply-volume
 ]
+
 ;-- seek to the time under design-x `dx` (throttled while dragging)
 do-seek-x: func [dx [integer!] /local tot frac ms][
 	tot: pt-duration
@@ -1448,14 +1415,13 @@ do-seek-x: func [dx [integer!] /local tot frac ms][
 	]
 ]
 
-;-- pointer events arrive in logical face coords; map back to 1024x768 design
-;-- map a logical face offset back to 1024x768 design space — the inverse of the
-;-- letterbox transform : subtract the centring offset, divide by the fit scale
+;-- map a logical face offset back to 1024x768 design (inverse of the letterbox transform)
 to-design: func [off][
 	as-pair
 		to integer! ((off/x - fit-ofs/x) / fit-s)
 		to integer! ((off/y - fit-ofs/y) / fit-s)
 ]
+
 pt-on-down: func [off /local pos][
 	pos: to-design off
 	btn-pressed: none
@@ -1487,6 +1453,7 @@ pt-on-down: func [off /local pos][
 		]
 	]
 ]
+
 pt-on-up: func [off /local pos][
 	pos: to-design off
 	if btn-pressed [
@@ -1502,6 +1469,7 @@ pt-on-up: func [off /local pos][
 	vol-drag?:   no
 	seek-drag?:  no
 ]
+
 pt-on-over: func [off /local d][
 	d: to-design off
 	if vol-drag?  [set-vol-from-x d/x]
@@ -1543,6 +1511,7 @@ load-file: func [f [file!] /local data res][
 		]
 	]
 ]
+
 load-mod: does [
 	f: request-file/title "Load module"
 	if none? f [exit]
@@ -1550,9 +1519,7 @@ load-mod: does [
 	load-file f
 ]
 
-;-- one animation frame : first-tick lazy init, drive the state machine, sync the
-;-- visible row/pattern, repaint.  Split out from `tick` so the timer guard stays
-;-- a tiny NON-throwing wrapper (see `tick`).  Contains no exit/return/throw.
+;-- one frame : first-tick init, drive the state machine, sync the view, repaint
 tick-frame: does [
 	;-- first tick : measure the real font metrics, then build the chrome with them
 	if empty? chrome-block [
@@ -1591,15 +1558,6 @@ tick-frame: does [
 	render
 ]
 
-;-- called DIRECTLY from the manual render loop (NOT a `rate` timer — see the loop
-;-- and the close-race analysis near the end of the file).  The guard keeps tick
-;-- inert and NON-throwing if it is ever reached while the window is closing or its
-;-- face has been torn down (`canvas/state` is none then) — cheap belt-and-braces on
-;-- top of the loop's own `win/state` exit condition.
-tick: does [
-	if all [not closing?  canvas/state][tick-frame]
-]
-
 ;-- precompute the Goertzel coefficients (2*cos w) + the Hann window in Red,
 ;-- push them to R/S (no trig needed on the R/S side)
 fill-spec-coeffs: does [
@@ -1618,8 +1576,8 @@ fill-spec-coeffs: does [
 	]
 ]
 
-chrome-block:   copy []         ;-- built on the first tick, after measure-fonts
-wordmark-block: copy []
+chrome-block:   make block! 0         ;-- built on the first tick, after measure-fonts
+wordmark-block: make block! 0
 ;-- the persistent frame block (the zero-allocation loop's single buffer) and
 ;-- the cached channel layer, rebuilt only when the visible row/pattern moves
 frame-blk: make block! 6000
@@ -1628,59 +1586,59 @@ frame-tail: none                ;-- set right after the scale prefix, below
 
 ;-- Red/View is per-monitor-DPI-aware (manifest) -> face coords are LOGICAL.
 ;-- Size the canvas = physical(1024x768) / desktop-scale; draw through `scale`.
-dpi: 1.0
+DPI: 1.0
 attempt [
 	raw: system/view/screens/1/data
-	if number? raw [dpi: either raw > 8.0 [raw / 100.0][1.0 * raw]]
+	if number? raw [DPI: either raw > 8.0 [raw / 100.0][1.0 * raw]]
 ]
-if dpi <= 0.0 [dpi: 1.0]
-draw-scale: 1.0 / dpi
-face-size: as-pair (to integer! (win-size/x * draw-scale)) (to integer! (win-size/y * draw-scale))
+if DPI <= 0.0 [DPI: 1.0]
+draw-scale: 1.0 / DPI
+face-size: as-pair to integer! (win-size/x * draw-scale) to integer! (win-size/y * draw-scale)
 
-;-- LETTERBOX FIT : the 1024x768 design is scaled to the LARGEST size that fits
-;-- the canvas while preserving its 4:3 aspect, then centred; the margins are
-;-- filled with chrome gray (so a non-4:3 / maximized window reads as the UI
-;-- centred in gray, not black bars).  Recomputed on every resize / maximize.
+;-- LETTERBOX FIT : scale the 1024x768 design to the largest 4:3 size that fits,
+;-- centre it, fill the margins with chrome gray. Recomputed on resize/maximize.
 fit-s:   draw-scale             ;-- design -> device scale
 fit-ofs: 0x0                    ;-- device-space centring offset (pair!)
+
 recompute-fit: func [sz [pair!]][
 	fit-s: min (1.0 * sz/x / win-size/x) (1.0 * sz/y / win-size/y)
 	fit-ofs: as-pair
 		to integer! ((sz/x - (win-size/x * fit-s)) / 2)
 		to integer! ((sz/y - (win-size/y * fit-s)) / 2)
 ]
-;-- (re)build the PERMANENT Draw prefix for canvas size `sz` : a full-canvas gray
-;-- fill (the letterbox margins, in device space) then translate+scale for the
-;-- design.  frame-tail is left right after it, so render only refills the design
-;-- layers past it (the zero-allocation loop is unchanged; resize is infrequent).
+
+;-- (re)build the permanent Draw prefix for canvas size `sz` : full-canvas gray fill
+;-- (letterbox margins) + translate/scale; frame-tail is left right after it
 rebuild-prefix: func [sz [pair!]][
 	recompute-fit sz
 	clear frame-blk
-	append frame-blk reduce [
-		'anti-alias 'on
-		'pen 'off 'fill-pen col-bg 'box 0x0 sz
-		'translate fit-ofs 'scale fit-s fit-s
+	append frame-blk compose [
+		anti-alias on
+		pen off fill-pen (col-bg) box 0x0 (sz)
+		translate (fit-ofs) scale (fit-s) (fit-s)
 	]
 	frame-tail: tail frame-blk
 ]
 rebuild-prefix face-size
 
+init
 init-rc: pt-init
 unless zero? init-rc [print ["*** pt-init failed, code=" init-rc]]
 if zero? init-rc [fill-spec-coeffs]
-cli: system/options/args
-if all [zero? init-rc  block? cli  not empty? cli][load-file to-red-file first cli]
+CLI: system/options/args
+if all [zero? init-rc  block? CLI  not empty? CLI][load-file to-red-file first CLI]
 
 win: layout compose [
 	title "CherryTracker"
 	origin 0x0
 	canvas: base (face-size) all-over draw []
-		on-time [tick]                ;-- actor wired, but rate stays NONE except
-		on-down [pt-on-down event/offset]   ;-- transiently during a move/resize drag
+		on-time [if all [not closing?  canvas/state][tick-frame]]   ;-- rate stays NONE except during a drag
+		on-down [pt-on-down event/offset]
 		on-over [pt-on-over event/offset]
 		on-up   [pt-on-up event/offset]
 ]
-;-- re-letterbox to a new client size `sz` (non-throwing guard, same as tick)
+
+;-- re-letterbox to a new client size `sz` (non-throwing guard, same as the render loop)
 relayout: func [sz [pair!]][
 	if all [not closing?  canvas/state][
 		canvas/size: sz
@@ -1688,51 +1646,36 @@ relayout: func [sz [pair!]][
 		render
 	]
 ]
-;-- KEEP PLAYING + ANIMATING WHILE MOVING/RESIZING.  Those OS modal loops block the
-;-- manual render loop (below), but they DO pump WM_TIMER — so arm a transient
-;-- `rate` timer for the duration of the drag and `tick` keeps firing through it
-;-- (audio pump + animation).  The manual loop disarms it the instant it regains
-;-- control.  Only the size/move modal loops fire on-resizing/on-moving and arm it;
-;-- the ✕-button modal loop fires NEITHER, so the close path stays timer-free and
-;-- the Error 95 race cannot come back.
+
+;-- move/resize modal loops block the manual loop but pump WM_TIMER : arm a transient
+;-- `rate` timer for the drag so audio+animation keep going; the loop disarms it.
 arm-modal-timer: does [unless timer-on? [canvas/rate: 60  timer-on?: yes]]
 
 win/flags: [resize]             ;-- WS_THICKFRAME + keeps the maximize box (gui.reds OS-make-view)
 win/actors: make object! [
-	;-- on close : latch `closing?`, defensively kill any timer (normally already
-	;-- off — a drag can't overlap a close), silence the device; the loop then exits
+	;-- close : latch `closing?`, kill any timer, silence the device; the loop then exits
 	on-close: func [face event][
 		closing?: yes
 		canvas/rate: none
 		pt-pause-dev
 	]
-	;-- DURING a drag : arm the timer + follow the new size live.  EVT_SIZE is
-	;-- SUPPRESSED while win-state=1 (events.reds:1675), so `on-resize` alone won't
-	;-- relayout mid-drag — `on-resizing` must.
+	;-- during a drag : arm timer + relayout live (EVT_SIZE suppressed mid-drag, so
+	;-- on-resize alone won't — on-resizing must)
 	on-resizing: func [face event][arm-modal-timer  relayout face/size]
 	on-moving:   func [face event][arm-modal-timer]
 	;-- final commit (WM_EXITSIZEMOVE) + maximize / programmatic resize
 	on-resize:   func [face event][relayout face/size]
 ]
-;-- install the persistent frame block ONCE; every later frame only mutates it
-;-- (ownership events from the mutations keep the canvas repainting)
+;-- install the persistent frame block ONCE; later frames only mutate it (auto-repaints)
 canvas/draw: frame-blk
 
-;-- MANUAL render loop instead of a permanent `rate`/`on-time` timer.  A timer
-;-- dispatches `tick` as an EVENT; the ✕-button's modal loop keeps pumping those
-;-- timer events while the window tears down, and that interleaving occasionally
-;-- corrupts Red's per-event try-frame state -> an escaped THROW = "Runtime Error
-;-- 95: no CATCH for THROW" (rare on Windows, more frequent on GTK).  Driving `tick`
-;-- DIRECTLY here, with the close handled by `do-events`, keeps the timer OFF on the
-;-- close path.  The ONLY time a timer runs is transiently during a move/resize drag
-;-- (armed by on-resizing/on-moving above — that modal loop blocks this one but
-;-- pumps WM_TIMER, so animation/audio continue); we disarm it the instant we regain
-;-- control.  `win/state` becomes none when the close removes the face, ending the
-;-- loop.  `wait` paces ~60fps at low CPU (same granularity ceiling `rate` hit).
+;-- Manual loop, NOT a permanent `rate` timer : timer events pumped during the ✕
+;-- teardown corrupt Red's try-frame state -> uncaught THROW ("Error 95").  `win/state`
+;-- ends the loop; `wait` paces ~60fps.
 view/no-wait win
 while [win/state][
 	if timer-on? [canvas/rate: none  timer-on?: no]   ;-- reclaim rendering from the drag timer
-	tick
+	if all [not closing?  canvas/state][tick-frame]   ;-- close-guard inlined (inert + non-throwing during teardown)
 	do-events/no-wait
 	if win/state [wait 0:0:0.01]
 ]
