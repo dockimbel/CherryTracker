@@ -571,7 +571,7 @@ scratch: make face! [
 	visible?: no
 ]
 
-text-size: func [fnt str /local sz][
+text-size: func [fnt [object!] str [string!] /local sz][
 	scratch/font: fnt
 	scratch/text: str
 	sz: attempt [size-text scratch]
@@ -579,7 +579,7 @@ text-size: func [fnt str /local sz][
 ]
 
 ;-- y offset that vertically centers a line box of height `th` in a cell of height `ch`
-cen-y: func [ch th][
+cen-y: func [ch [integer!] th [number!]][
 	to integer! ((ch - th) / 2)
 ]
 
@@ -622,16 +622,16 @@ measure-fonts: func [/local s][
 ;-- one-time builders, used to fill the string tables below; the render loop
 ;-- itself never builds a string (see the zero-allocation note before render)
 
-pad2: func [n][either n < 10 [rejoin ["0" n]][form n]]
+pad2: func [n [integer!]][either n < 10 [rejoin ["0" n]][form n]]
 
-hex2: func [v /local hi lo][
+hex2: func [v [integer!] /local hi lo][
 	if v < 0 [v: 0]
 	hi: to integer! (v / 16)
 	lo: v - (hi * 16)
 	rejoin [HEXD/(hi + 1) HEXD/(lo + 1)]
 ]
 
-note-name: func [n /local oct idx][
+note-name: func [n [integer!] /local oct idx][
 	case [
 		n = 0    ["..."]
 		n >= 128 ["==="]
@@ -643,15 +643,15 @@ note-name: func [n /local oct idx][
 	]
 ]
 
-fx-type: func [t][either all [t >= 0  t <= 35] [FXCH/(t + 1)][#"?"]]
+fx-type: func [t [integer!]][either all [t >= 0  t <= 35] [FXCH/(t + 1)][#"?"]]
 
 ;-- append-into formatters : fill a reused buffer in place, no allocation
-pad2-into: func [buf n][
+pad2-into: func [buf [string!] n [integer!]][
 	if n < 10 [append buf #"0"]
 	append buf n
 ]
 
-pad3-into: func [buf n][
+pad3-into: func [buf [string!] n [integer!]][
 	either n < 0 [append buf "000"][
 		if n < 100 [append buf #"0"]
 		if n < 10  [append buf #"0"]
@@ -659,7 +659,7 @@ pad3-into: func [buf n][
 	]
 ]
 
-fmt-time-into: func [buf ms /local s m][
+fmt-time-into: func [buf [string!] ms [integer!] /local s m][
 	if ms < 0 [ms: 0]
 	s: to integer! (ms / 1000)
 	m: to integer! (s / 60)
@@ -680,7 +680,7 @@ state-tags: [idle "IDLE" playing "PLAYING" paused "PAUSED" draining "DRAINING" w
 ;-- one series per dynamic text cell (declared so compiled mode sees the globals; filled by `init`)
 pos-buf: pat-buf: npat-buf: chn-buf: inb-buf: smp-buf: bpm-buf: spd-buf: vol-buf: el-buf: rem-buf: tot-buf: none
 
-note-str: func [n][
+note-str: func [n [integer!]][
 	case [
 		n = 0    ["..."]
 		n >= 128 ["==="]
@@ -688,10 +688,10 @@ note-str: func [n][
 	]
 ]
 
-hex-str: func [v][either all [v >= 0  v < 256][hex-strs/(v + 1)][hex-strs/1]]
-row-str: func [r][either all [r >= 0  r < 256][row-strs/(r + 1)][pad2 r]]
+hex-str: func [v [integer!]][either all [v >= 0  v < 256][hex-strs/(v + 1)][hex-strs/1]]
+row-str: func [r [integer!]][either all [r >= 0  r < 256][row-strs/(r + 1)][pad2 r]]
 
-cell-buf: func [i][
+cell-buf: func [i [integer!]][
 	while [i > length? cell-pool][append/only cell-pool make string! 12]
 	clear cell-pool/(i)
 ]
@@ -714,7 +714,7 @@ init: does [
 
 ;-- every emit-* helper APPENDS its draw code into `out` (compose/into writes
 ;-- straight into the frame block : no intermediate block is ever allocated)
-emit-bevel: func [out org size face lt dk /local tr bl br][
+emit-bevel: func [out [block!] org [pair!] size [pair!] face [tuple!] lt [tuple!] dk [tuple!] /local tr bl br][
 	tr: org + (size * 1x0)
 	bl: org + (size * 0x1)
 	br: org + size
@@ -725,7 +725,7 @@ emit-bevel: func [out org size face lt dk /local tr bl br][
 	] tail out
 ]
 
-emit-sunken: func [out org size /local tr bl br][
+emit-sunken: func [out [block!] org [pair!] size [pair!] /local tr bl br][
 	tr: org + (size * 1x0)
 	bl: org + (size * 0x1)
 	br: org + size
@@ -736,11 +736,11 @@ emit-sunken: func [out org size /local tr bl br][
 	] tail out
 ]
 
-emit-sunken-strip: func [out org size][
+emit-sunken-strip: func [out [block!] org [pair!] size [pair!]][
 	emit-bevel out org size col-bg col-bevel-dk col-bevel-lt
 ]
 
-emit-val-box: func [out org size txt][
+emit-val-box: func [out [block!] org [pair!] size [pair!] txt [string!]][
 	emit-sunken-strip out org size
 	compose/into [
 		pen (col-ink) font fnt-val text (as-pair org/x + 6 org/y + cen-y size/y th-val) (txt)
@@ -748,7 +748,7 @@ emit-val-box: func [out org size txt][
 ]
 
 ;-- right-aligned variant of emit-val-box
-emit-val-box-r: func [out org size txt /local tx][
+emit-val-box-r: func [out [block!] org [pair!] size [pair!] txt [string!] /local tx][
 	tx: org/x + size/x - 7 - (to integer! (aw-val * length? txt))
 	emit-sunken-strip out org size
 	compose/into [
@@ -757,7 +757,7 @@ emit-val-box-r: func [out org size txt /local tx][
 ]
 
 ;-- white label + drop shadow (caller sets the font)
-emit-lbl-text: func [out pos txt][
+emit-lbl-text: func [out [block!] pos [pair!] txt [string!]][
 	compose/into [
 		pen (0.0.0.150)
 		text (pos + 1x1) (txt)
@@ -767,7 +767,7 @@ emit-lbl-text: func [out pos txt][
 ]
 
 ;-- mode = 'up | 'dn (pressed) | 'dis (disabled)
-emit-btn: func [out org size lbl mode /local lx ly][
+emit-btn: func [out [block!] org [pair!] size [pair!] lbl [string!] mode [word!] /local lx ly][
 	either mode = 'dn [
 		emit-bevel out org size col-face-dn col-bevel-dk col-bevel-lt
 	][
@@ -827,7 +827,7 @@ measure-icon-inks: function [][
 	]
 ]
 
-emit-btn-glyph: func [out org size gl mode /local icol sz lx ly fname oy][
+emit-btn-glyph: func [out [block!] org [pair!] size [pair!] gl [string!] mode [word!] /local icol sz lx ly fname oy][
 	either mode = 'dn [
 		emit-bevel out org size col-face-dn col-bevel-dk col-bevel-lt
 	][
@@ -851,7 +851,7 @@ emit-btn-glyph: func [out org size gl mode /local icol sz lx ly fname oy][
 	] tail out
 ]
 
-emit-slider: func [out org size frac /local tx][
+emit-slider: func [out [block!] org [pair!] size [pair!] frac [float!] /local tx][
 	if frac < 0.0 [frac: 0.0]
 	if frac > 1.0 [frac: 1.0]
 	tx: org/x + 1 + to integer! ((size/x - 12) * frac)
@@ -860,7 +860,7 @@ emit-slider: func [out org size frac /local tx][
 ]
 
 ;-- colour follows ABSOLUTE bar height (not fill ratio); org/size = bar cell, litpx/pk in px
-emit-grad-bar: func [out org size litpx pk /local br by ltop pky][
+emit-grad-bar: func [out [block!] org [pair!] size [pair!] litpx [integer!] pk [integer!] /local br by ltop pky][
 	br: org + size
 	by: br/y
 	ltop: by - litpx
@@ -885,7 +885,7 @@ emit-grad-bar: func [out org size litpx pk /local br by ltop pky][
 
 ;-- VU meter : green→red by absolute height, glossy bezel painted on the bar. Draws the
 ;-- lit bar ONLY — the black well is in emit-chan-notes, under the row highlight.
-emit-vu-bar: func [out org size litpx /local br by bx0 bx1 ltop lw rw][
+emit-vu-bar: func [out [block!] org [pair!] size [pair!] litpx [integer!] /local br by bx0 bx1 ltop lw rw][
 	br:  org + size
 	by:  br/y
 	bx0: org/x + 2                 ;-- bar inset inside the thin black frame
@@ -946,7 +946,7 @@ build-chrome: function [][
 ;-- (a WORD! — Draw needs fonts by word), rendered offscreen & pixel-scanned.
 ;-- lets us align glyphs from DIFFERENT fonts (the Segoe notes vs the Consolas
 ;-- wordmark) by their ink centre.  First-tick only — never in the frame path.
-ink-bounds: function [fword str /local img top bot c inked?][
+ink-bounds: function [fword [word!] str [string!] /local img top bot c inked?][
 	img: draw 240x90 compose [
 		pen off fill-pen 255.255.255 box 0x0 240x90
 		anti-alias on pen 0.0.0 font (fword) text 0x0 (str)
@@ -1006,7 +1006,7 @@ build-wordmark: function [][
 ]
 
 ;-- dynamic: param value boxes + position spinners + volume slider
-emit-params: function [out][
+emit-params: function [out [block!]][
 	vbx: pp-org/x + 124
 	ry:  pp-org/y + 10
 	;-- Position row : spinners + pos/len
@@ -1062,7 +1062,7 @@ emit-params: function [out][
 
 ;-- dynamic: transport buttons (mode reflects state, press + disabled)
 ;-- indexed walk over `btns` : a per-frame foreach would allocate its context
-emit-buttons: function [out][
+emit-buttons: function [out [block!]][
 	i: 1
 	while [i < length? btns][
 		lbl:  btns/(i)
@@ -1088,7 +1088,7 @@ emit-buttons: function [out][
 ]
 
 ;-- dynamic: spectrum-analyzer bars (envelope from the synced scope buffer)
-emit-spectrum: function [out][
+emit-spectrum: function [out [block!]][
 	iorg: spec-well
 	bw:   spec-bw
 	barw: bw - 2
@@ -1141,7 +1141,7 @@ emit-spectrum: function [out][
 ;-- dynamic: name-row values, seek slider, elapsed / remaining / total times
 ;-- (name-cache / file-line / type-cache are prepared by load-file, truncation
 ;-- included — the frame loop only references them)
-emit-names: function [out][
+emit-names: function [out [block!]][
 	tot: pt-duration
 	el: either find [playing paused draining] state [pt-time-ms][0]
 	if el > tot [el: tot]
@@ -1173,7 +1173,7 @@ emit-names: function [out][
 ]
 
 ;-- cached on view-pat/view-row/nch change; view-* may be virtual during winddown
-emit-chan-notes: function [out][
+emit-chan-notes: function [out [block!]][
 	nch: pt-channels
 	if nch <= 0 [nch: 4]
 	cpat:  view-pat
@@ -1268,7 +1268,7 @@ emit-chan-notes: function [out][
 ]
 
 ;-- per-channel VU meters (one bar at the left of each channel column)
-emit-chan-vu: function [out][
+emit-chan-vu: function [out [block!]][
 	nch: pt-channels
 	if nch <= 0 [nch: 4]
 	vb: pt-volbase
@@ -1341,7 +1341,7 @@ enter-winddown: does [
 	state: 'winddown
 ]
 
-do-action: func [lbl][
+do-action: func [lbl [string!]][
 	switch lbl [
 		"PLAY" [
 			if all [loaded?  state <> 'playing][
@@ -1416,14 +1416,14 @@ do-seek-x: func [dx [integer!] /local tot frac ms][
 ]
 
 ;-- map a logical face offset back to 1024x768 design (inverse of the letterbox transform)
-to-design: func [off][
+to-design: func [ofs [pair! point2D!]][
 	as-pair
-		to integer! ((off/x - fit-ofs/x) / fit-s)
-		to integer! ((off/y - fit-ofs/y) / fit-s)
+		to integer! ((ofs/x - fit-ofs/x) / fit-s)
+		to integer! ((ofs/y - fit-ofs/y) / fit-s)
 ]
 
-pt-on-down: func [off /local pos][
-	pos: to-design off
+pt-on-down: func [ofs [pair! point2D!] /local pos][
+	pos: to-design ofs
 	btn-pressed: none
 	case [
 		within? pos (vol-org - 6x8) (vol-size + 12x16) [
@@ -1454,8 +1454,8 @@ pt-on-down: func [off /local pos][
 	]
 ]
 
-pt-on-up: func [off /local pos][
-	pos: to-design off
+pt-on-up: func [ofs [pair! point2D!] /local pos][
+	pos: to-design ofs
 	if btn-pressed [
 		foreach [lbl borg] btns [
 			if all [lbl = btn-pressed  within? pos borg btn-size][
@@ -1470,8 +1470,8 @@ pt-on-up: func [off /local pos][
 	seek-drag?:  no
 ]
 
-pt-on-over: func [off /local d][
-	d: to-design off
+pt-on-over: func [ofs [pair! point2D!] /local d][
+	d: to-design ofs
 	if vol-drag?  [set-vol-from-x d/x]
 	if seek-drag? [do-seek-x d/x]
 ]
@@ -1654,17 +1654,17 @@ arm-modal-timer: does [unless timer-on? [canvas/rate: 60  timer-on?: yes]]
 win/flags: [resize]             ;-- WS_THICKFRAME + keeps the maximize box (gui.reds OS-make-view)
 win/actors: make object! [
 	;-- close : latch `closing?`, kill any timer, silence the device; the loop then exits
-	on-close: func [face event][
+	on-close: func [face [object!] event [event!]][
 		closing?: yes
 		canvas/rate: none
 		pt-pause-dev
 	]
 	;-- during a drag : arm timer + relayout live (EVT_SIZE suppressed mid-drag, so
 	;-- on-resize alone won't — on-resizing must)
-	on-resizing: func [face event][arm-modal-timer  relayout face/size]
-	on-moving:   func [face event][arm-modal-timer]
+	on-resizing: func [face [object!] event [event!]][arm-modal-timer  relayout face/size]
+	on-moving:   func [face [object!] event [event!]][arm-modal-timer]
 	;-- final commit (WM_EXITSIZEMOVE) + maximize / programmatic resize
-	on-resize:   func [face event][relayout face/size]
+	on-resize:   func [face [object!] event [event!]][relayout face/size]
 ]
 ;-- install the persistent frame block ONCE; later frames only mutate it (auto-repaints)
 canvas/draw: frame-blk
