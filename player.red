@@ -465,6 +465,7 @@ fnt-mono: make font! [name: "Consolas" style: 'bold]
 fnt-sym:  make font! [name: "Segoe UI Symbol" style: 'bold]
 fnt-logo: make fnt-mono [size: 24]
 fnt-lbl:  make fnt-mono [size: 13]
+fnt-ver:  make fnt-mono [size: 11]              ;-- version tag beside the wordmark
 fnt-val:  make fnt-mono [size: 15]
 fnt-btn:  make fnt-mono [size: 14]
 fnt-chan: make fnt-mono [size: 11]              ;-- CH numbers : shrunk for narrow columns
@@ -990,8 +991,8 @@ ink-bounds: function [fword [word!] str [string!] /local img top bot c inked?][
 build-wordmark: function [][
 	out: make block! 64
 	;-- exact advances via the measurement-DIFFERENCE trick (constant padding cancels)
-	cadv: (text-size fnt-logo "CherryCherry") - (text-size fnt-logo "Cherry")
-	nadv: (text-size fnt-note "🎶🎶")         - (text-size fnt-note "🎶")   ;-- leading 🎶 advance
+	cadv: (text-size fnt-logo "CherryCherry") - text-size fnt-logo "Cherry"
+	nadv: (text-size fnt-note "🎶🎶")         - text-size fnt-note "🎶"   ;-- leading 🎶 advance
 	gap: 8
 	ex:  hd-org/x + 14                          ;-- leading 🎶 position
 	cx:  ex + nadv/x + gap                       ;-- "Cherry" after the note
@@ -1001,9 +1002,15 @@ build-wordmark: function [][
 	gy1: ly + th-logo - 6
 	;-- centre the note's own ink on the wordmark cap band (Segoe vs Consolas metrics)
 	li:  ink-bounds 'fnt-logo "C"
-	lc:  to integer! ((li/1 + li/2) / 2)         ;-- wordmark cap ink centre
+	lc:  to integer! (li/1 + li/2) / 2           ;-- wordmark cap ink centre
 	nb:  ink-bounds 'fnt-note "🎶"               ;-- leading 🎶 ink
-	bey: ly + lc - (to integer! ((nb/1 + nb/2) / 2))
+	bey: ly + lc - to integer! (nb/1 + nb/2) / 2
+	;-- small version tag to the right of "Tracker"
+	tadv: (text-size fnt-logo "TrackerTracker") - text-size fnt-logo "Tracker"
+	ver:  rejoin ["v" system/script/header/version]
+	vx:   tx + tadv/x + 10
+	vt:   ink-bounds 'fnt-ver ver                 ;-- align the version's ink bottom (baseline)
+	vy:   ly + li/2 - vt/2                        ;-- to the title's (li/2 = "C" ink bottom)
 	
 	compose/into [
 		;-- shadow pass (1px offset, translucent dark) for every glyph
@@ -1023,6 +1030,7 @@ build-wordmark: function [][
 		;-- Tracker : stem-green vertical gradient (no trailing note)
 		pen linear (col-stem-t) 0.0 (col-stem-b) 1.0 (as-pair tx gy0) (as-pair tx gy1)
 		text (as-pair tx ly) "Tracker"
+		font fnt-ver pen (col-dim) text (as-pair vx vy) (ver)
 	] tail out
 	out
 ]
