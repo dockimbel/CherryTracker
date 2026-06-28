@@ -1,10 +1,10 @@
 Red/System [
-	Title:   "protracker-red — SDL3 audio output (slim)"
+	Title:   "CherryTracker — SDL3 audio output (slim)"
 	Author:  "Nenad Rakocevic"
 	Purpose: {
-        Minimal SDL3 audio-output binding, adapted from sdl-red/audio.reds.
-        Just enough to push libxmp's decoded PCM to the default playback
-        device through a device-bound audio stream that we feed by hand.
+        Minimal SDL3 audio-output binding. Just enough to push libxmp's 
+        decoded PCM to the default playback device through a device-bound
+        audio stream that we feed by hand.
 
         SDL runs its own internal audio thread and pulls from the stream's
         queue, so the caller only has to keep that queue topped up
@@ -33,7 +33,7 @@ SDL-AudioSpec!: alias struct! [
 ;-- ============================================================
 #import [
 	"libs/SDL3" cdecl [
-		SDL_Init:     "SDL_Init"     [flags [integer!] return: [integer!]]
+		SDL_Init:     "SDL_Init"     [flags [integer!] return: [logic!]]
 		SDL_Quit:     "SDL_Quit"     []
 		SDL_GetError: "SDL_GetError" [return: [c-string!]]
 		;-- steer the audio backend (Red/View holds an STA OLE apartment on the

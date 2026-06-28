@@ -71,23 +71,17 @@ Red [
 	pt-cs:  as byte-ptr! 0                      ;-- PT-SCOPE-N current scope
 
 	;-- spectrum analyzer (Goertzel) : float arrays
-	pt-spec-coeff: as pointer! [float!] 0       ;-- PT-NB filter coeffs (2*cos w), from Red
-	pt-spec-mag:   as pointer! [float!] 0       ;-- PT-NB current band magnitudes (squared)
-	pt-fft-buf:    as pointer! [float!] 0       ;-- PT-FFT-N mono scratch samples
-	pt-spec-win:   as pointer! [float!] 0       ;-- PT-FFT-N Hann window, from Red
-
-	;-- typed array element access -----------------------------------------
-	pt-geti: func [arr [int-ptr!]  k [integer!] return: [integer!] /local p [int-ptr!]][p: arr + k  p/value]
-	pt-seti: func [arr [int-ptr!]  k [integer!] v [integer!]       /local p [int-ptr!]][p: arr + k  p/value: v]
-	pt-getb: func [arr [byte-ptr!] k [integer!] return: [integer!] /local p [byte-ptr!]][p: arr + k  as integer! p/value]
-	pt-setb: func [arr [byte-ptr!] k [integer!] v [integer!]       /local p [byte-ptr!]][p: arr + k  p/value: as byte! v]
-	pt-getf: func [arr [pointer! [float!]] k [integer!] return: [float!] /local p [pointer! [float!]]][p: arr + k  p/value]
-	pt-setf: func [arr [pointer! [float!]] k [integer!] v [float!]        /local p [pointer! [float!]]][p: arr + k  p/value: v]
+	pt-spec-coeff: as float-ptr! 0       ;-- PT-NB filter coeffs (2*cos w), from Red
+	pt-spec-mag:   as float-ptr! 0       ;-- PT-NB current band magnitudes (squared)
+	pt-fft-buf:    as float-ptr! 0       ;-- PT-FFT-N mono scratch samples
+	pt-spec-win:   as float-ptr! 0       ;-- PT-FFT-N Hann window, from Red
 
 	;-- read a signed little-endian 16-bit sample at byte offset ofs
-	pt-read-s16: func [b [byte-ptr!] ofs [integer!] return: [integer!] /local lo [integer!] hi [integer!] v [integer!]][
-		lo: pt-getb b ofs
-		hi: pt-getb b (ofs + 1)
+	pt-read-s16: func [b [byte-ptr!] ofs [integer!] return: [integer!] /local lo hi v [integer!]][
+		ofs: ofs + 1
+		lo: as integer! b/ofs
+		ofs: ofs + 1
+		hi: as integer! b/ofs
 		v: (hi << 8) or lo
 		if v >= 32768 [v: v - 65536]
 		v
@@ -97,36 +91,38 @@ Red [
 	pt-rs-init: func [return: [integer!] /local i [integer!]][
 		pt-ctx: xmp_create_context
 		if null? pt-ctx [return 1]
-		;-- SDL3's C bool return marshals unreliably through R/S (only AL is set);
-		;-- ignore it and confirm the audio subsystem via the current-driver string
+		;-- SDL_Init's bool comes back in AL with garbage upper EAX; R/S not/unless
+		;-- misread that non-canonical logic!, so gate on the driver string, not the return
 		SDL_Init SDL-INIT-AUDIO
 		if null? SDL_GetCurrentAudioDriver [return 2]
+		
 		pt-fib: allocate XMP-FRAME-INFO-SIZE
 		pt-fi:  as xmp-frame-info! pt-fib
 		pt-mib: allocate XMP-MODULE-INFO-SIZE
-		pt-rb-end:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-pos:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-pat:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-row:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-nrows: as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-bpm:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-spd:   as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-gvol:  as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-time:  as int-ptr! allocate (PT-RING-DEPTH * 4)
-		pt-rb-vol:   allocate (PT-RING-DEPTH * 64)
-		pt-rb-note:  allocate (PT-RING-DEPTH * 64)
-		pt-rb-scope: allocate (PT-RING-DEPTH * PT-SCOPE-N)
+		pt-rb-end:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-pos:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-pat:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-row:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-nrows: as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-bpm:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-spd:   as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-gvol:  as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-time:  as int-ptr! allocate PT-RING-DEPTH * 4
+		pt-rb-vol:   allocate PT-RING-DEPTH * 64
+		pt-rb-note:  allocate PT-RING-DEPTH * 64
+		pt-rb-scope: allocate PT-RING-DEPTH * PT-SCOPE-N
 		pt-cv: allocate 64
 		pt-cn: allocate 64
 		pt-cs: allocate PT-SCOPE-N
-		pt-spec-coeff: as pointer! [float!] allocate (PT-NB * 8)
-		pt-spec-mag:   as pointer! [float!] allocate (PT-NB * 8)
-		pt-fft-buf:    as pointer! [float!] allocate (PT-FFT-N * 8)
-		pt-spec-win:   as pointer! [float!] allocate (PT-FFT-N * 8)
-		i: 0  while [i < 64][pt-setb pt-cv i 0  pt-setb pt-cn i 0  i: i + 1]
-		i: 0  while [i < PT-SCOPE-N][pt-setb pt-cs i 0  i: i + 1]
-		i: 0  while [i < PT-NB][pt-setf pt-spec-coeff i 0.0  pt-setf pt-spec-mag i 0.0  i: i + 1]
-		i: 0  while [i < PT-FFT-N][pt-setf pt-spec-win i 1.0  i: i + 1]
+		pt-spec-coeff: as float-ptr! allocate PT-NB * 8
+		pt-spec-mag:   as float-ptr! allocate PT-NB * 8
+		pt-fft-buf:    as float-ptr! allocate PT-FFT-N * 8
+		pt-spec-win:   as float-ptr! allocate PT-FFT-N * 8
+		
+		i: 1  while [i <= 64][pt-cv/i: null-byte  pt-cn/i: null-byte  i: i + 1]
+		i: 1  while [i <= PT-SCOPE-N][pt-cs/i: null-byte  i: i + 1]
+		i: 1  while [i <= PT-NB][pt-spec-coeff/i: 0.0  pt-spec-mag/i: 0.0  i: i + 1]
+		i: 1  while [i <= PT-FFT-N][pt-spec-win/i: 1.0  i: i + 1]
 		pt-inited?: yes
 		0
 	]
@@ -141,10 +137,11 @@ Red [
 
 	;-- after a module is loaded: read info, start player, open/clear stream
 	pt-rs-open: func [return: [integer!] /local r [integer!]][
-		xmp_get_module_info pt-ctx (as int-ptr! pt-mib)
+		xmp_get_module_info pt-ctx as int-ptr! pt-mib
 		pt-modp:  xmp-modinfo-mod pt-mib
 		pt-vbase: xmp-modinfo-volbase pt-mib
 		pt-nchan: xmp-mod-chn pt-modp
+		
 		if pt-vbase <= 0 [pt-vbase: 64]
 		if pt-nchan <= 0 [pt-nchan: 4]
 		if pt-nchan > 64 [pt-nchan: 64]
@@ -152,7 +149,8 @@ Red [
 		if r <> 0 [return r]
 		xmp_get_frame_info pt-ctx (as int-ptr! pt-fib)
 		pt-dur: pt-fi/total-time
-		if not pt-opened? [
+		
+		unless pt-opened? [
 			pt-spec/format:   SDL-AUDIO-S16
 			pt-spec/channels: 2
 			pt-spec/freq:     44100
@@ -166,26 +164,29 @@ Red [
 	]
 
 	;-- store the current frame_info into ring slot `pt-head`
-	pt-rs-record: func [/local slot [integer!] i [integer!] base [integer!] nsamp [integer!] idx [integer!] sv [integer!] s8 [integer!]][
+	pt-rs-record: func [/local slot sl i base bi nsamp idx sv s8 [integer!]][
 		slot: pt-head // PT-RING-DEPTH
-		pt-seti pt-rb-end   slot pt-total
-		pt-seti pt-rb-pos   slot pt-fi/pos
-		pt-seti pt-rb-pat   slot pt-fi/pattern
-		pt-seti pt-rb-row   slot pt-fi/row
-		pt-seti pt-rb-nrows slot pt-fi/num-rows
-		pt-seti pt-rb-bpm   slot pt-fi/bpm
-		pt-seti pt-rb-spd   slot pt-fi/speed
-		pt-seti pt-rb-gvol  slot pt-fi/volume
-		pt-seti pt-rb-time  slot pt-fi/time
+		sl:   slot + 1
+		pt-rb-end/sl:   pt-total
+		pt-rb-pos/sl:   pt-fi/pos
+		pt-rb-pat/sl:   pt-fi/pattern
+		pt-rb-row/sl:   pt-fi/row
+		pt-rb-nrows/sl: pt-fi/num-rows
+		pt-rb-bpm/sl:   pt-fi/bpm
+		pt-rb-spd/sl:   pt-fi/speed
+		pt-rb-gvol/sl:  pt-fi/volume
+		pt-rb-time/sl:  pt-fi/time
+		
 		base: slot * 64
 		i: 0
 		while [i < 64][
+			bi: base + i + 1
 			either i < pt-nchan [
-				pt-setb pt-rb-vol  (base + i) (xmp-chan-vol  pt-fib i)
-				pt-setb pt-rb-note (base + i) (xmp-chan-note pt-fib i)
+				pt-rb-vol/bi:  as byte! xmp-chan-vol  pt-fib i
+				pt-rb-note/bi: as byte! xmp-chan-note pt-fib i
 			][
-				pt-setb pt-rb-vol  (base + i) 0
-				pt-setb pt-rb-note (base + i) 0
+				pt-rb-vol/bi:  null-byte
+				pt-rb-note/bi: null-byte
 			]
 			i: i + 1
 		]
@@ -194,6 +195,7 @@ Red [
 		base:  slot * PT-SCOPE-N
 		i: 0
 		while [i < PT-SCOPE-N][
+			bi: base + i + 1
 			either nsamp > 0 [
 				idx: (i * nsamp) / PT-SCOPE-N
 				sv:  pt-read-s16 pt-fi/buffer (idx * 4)
@@ -203,51 +205,60 @@ Red [
 			][
 				s8: 128
 			]
-			pt-setb pt-rb-scope (base + i) s8
+			pt-rb-scope/bi: as byte! s8
 			i: i + 1
 		]
 		pt-head: pt-head + 1
 	]
 
 	;-- Goertzel spectrum: PT-NB band magnitudes(^2) from the last frame's PCM
-	pt-rs-spectrum: func [/local n [integer!] j [integer!] i [integer!] iv [integer!]
-	                              x [float!] s0 [float!] s1 [float!] s2 [float!] cf [float!] m [float!] bufp [byte-ptr!]][
-		if not pt-opened? [exit]
+	pt-rs-spectrum: func [
+		/local
+			bufp [byte-ptr!]
+			n j j1 i i1 iv [integer!]
+			x s0 s1 s2 cf m [float!]
+	][
+		unless pt-opened? [exit]
 		n: pt-fi/buffer-size / 4
 		if n > PT-FFT-N [n: PT-FFT-N]
 		if n <= 0 [exit]
+		
 		bufp: pt-fi/buffer
 		j: 0
 		while [j < n][
+			j1: j + 1
 			iv: pt-read-s16 bufp (j * 4)
 			x:  as float! iv
-			pt-setf pt-fft-buf j ((x / 32768.0) * (pt-getf pt-spec-win j))   ;-- Hann window
+			pt-fft-buf/j1: x / 32768.0 * pt-spec-win/j1   ;-- Hann window
 			j: j + 1
 		]
 		i: 0
 		while [i < PT-NB][
-			cf: pt-getf pt-spec-coeff i
+			i1: i + 1
+			cf: pt-spec-coeff/i1
 			s1: 0.0
 			s2: 0.0
 			j: 0
 			while [j < n][
-				x:  pt-getf pt-fft-buf j
+				j1: j + 1
+				x:  pt-fft-buf/j1
 				s0: x + (cf * s1) - s2
 				s2: s1
 				s1: s0
 				j: j + 1
 			]
 			m: (s1 * s1) + (s2 * s2) - (cf * s1 * s2)
-			pt-setf pt-spec-mag i m
+			pt-spec-mag/i1: m
 			i: i + 1
 		]
 	]
 
 	;-- render frames until the SDL queue holds ~PT-QTARGET bytes
-	pt-rs-pump: func [return: [integer!] /local r [integer!] q [integer!]][
-		if not pt-opened? [return 1]
-		if pt-ended? [return 1]
+	pt-rs-pump: func [return: [logic!] /local r q [integer!]][
+		unless pt-opened? [return yes]
+		if pt-ended? [return yes]
 		q: SDL_GetAudioStreamQueued pt-strm
+		
 		while [all [not pt-ended?  q < PT-QTARGET]][
 			r: xmp_play_frame pt-ctx
 			either r = 0 [
@@ -264,42 +275,49 @@ Red [
 			]
 			q: SDL_GetAudioStreamQueued pt-strm
 		]
-		if not pt-ended? [pt-rs-spectrum]
-		either pt-ended? [1][0]
+		unless pt-ended? [pt-rs-spectrum]
+		pt-ended?
 	]
 
 	;-- surface the snapshot that is actually audible right now
-	pt-rs-sync: func [/local played [integer!] q [integer!] best [integer!] k [integer!] slot [integer!] i [integer!] base [integer!]][
-		if not pt-opened? [exit]
+	pt-rs-sync: func [/local played q best k ke slot sl i ci base bi [integer!]][
+		unless pt-opened? [exit]
 		q: SDL_GetAudioStreamQueued pt-strm
 		played: pt-total - q
 		best: -1
 		k: pt-tail
 		while [k < pt-head][
-			if (pt-geti pt-rb-end (k // PT-RING-DEPTH)) <= played [best: k]
+			ke: k // PT-RING-DEPTH + 1
+			if pt-rb-end/ke <= played [best: k]
 			k: k + 1
 		]
 		if best < 0 [exit]
+		
 		slot: best // PT-RING-DEPTH
-		pt-cur-pos:   pt-geti pt-rb-pos   slot
-		pt-cur-pat:   pt-geti pt-rb-pat   slot
-		pt-cur-row:   pt-geti pt-rb-row   slot
-		pt-cur-nrows: pt-geti pt-rb-nrows slot
-		pt-cur-bpm:   pt-geti pt-rb-bpm   slot
-		pt-cur-spd:   pt-geti pt-rb-spd   slot
-		pt-cur-gvol:  pt-geti pt-rb-gvol  slot
-		pt-cur-time:  pt-geti pt-rb-time  slot
+		sl:   slot + 1
+		pt-cur-pos:   pt-rb-pos/sl
+		pt-cur-pat:   pt-rb-pat/sl
+		pt-cur-row:   pt-rb-row/sl
+		pt-cur-nrows: pt-rb-nrows/sl
+		pt-cur-bpm:   pt-rb-bpm/sl
+		pt-cur-spd:   pt-rb-spd/sl
+		pt-cur-gvol:  pt-rb-gvol/sl
+		pt-cur-time:  pt-rb-time/sl
 		base: slot * 64
 		i: 0
 		while [i < 64][
-			pt-setb pt-cv i (pt-getb pt-rb-vol  (base + i))
-			pt-setb pt-cn i (pt-getb pt-rb-note (base + i))
+			bi: base + i + 1
+			ci: i + 1
+			pt-cv/ci: pt-rb-vol/bi
+			pt-cn/ci: pt-rb-note/bi
 			i: i + 1
 		]
 		base: slot * PT-SCOPE-N
 		i: 0
 		while [i < PT-SCOPE-N][
-			pt-setb pt-cs i (pt-getb pt-rb-scope (base + i))
+			bi: base + i + 1
+			ci: i + 1
+			pt-cs/ci: pt-rb-scope/bi
 			i: i + 1
 		]
 		pt-tail: best
@@ -311,20 +329,20 @@ Red [
 		pt-cur-pat:  0
 		pt-cur-row:  0
 		pt-cur-time: 0
-		i: 0
-		while [i < 64][
-			pt-setb pt-cv i 0
-			pt-setb pt-cn i 0
+		i: 1
+		while [i <= 64][
+			pt-cv/i: null-byte
+			pt-cn/i: null-byte
 			i: i + 1
 		]
-		i: 0
-		while [i < PT-NB][
-			pt-setf pt-spec-mag i 0.0
+		i: 1
+		while [i <= PT-NB][
+			pt-spec-mag/i: 0.0
 			i: i + 1
 		]
-		i: 0
-		while [i < PT-SCOPE-N][
-			pt-setb pt-cs i 128
+		i: 1
+		while [i <= PT-SCOPE-N][
+			pt-cs/i: as byte! 128
 			i: i + 1
 		]
 	]
@@ -333,11 +351,11 @@ Red [
 ;===============================================================================
 ;  routine! bridges  (Red-callable)
 ;===============================================================================
-pt-init:    routine [return: [integer!]][pt-rs-init]
-pt-pump:    routine [return: [integer!]][pt-rs-pump]
-pt-sync:    routine [][pt-rs-sync]
+pt-init: routine [return: [integer!]][pt-rs-init]
+pt-pump: routine [return: [logic!]][pt-rs-pump]
+pt-sync: routine [][pt-rs-sync]
 
-pt-load-mem: routine [bin [binary!] return: [integer!] /local p [byte-ptr!] n [integer!] r [integer!]][
+pt-load-mem: routine [bin [binary!] return: [integer!] /local p [byte-ptr!] n r [integer!]][
 	if pt-loaded? [
 		xmp_end_player     pt-ctx
 		xmp_release_module pt-ctx
@@ -362,12 +380,12 @@ pt-gvol:     routine [return: [integer!]][pt-cur-gvol]
 pt-time-ms:  routine [return: [integer!]][pt-cur-time]
 pt-channels: routine [return: [integer!]][pt-nchan]
 pt-volbase:  routine [return: [integer!]][pt-vbase]
-pt-cvol:     routine [i [integer!] return: [integer!]][pt-getb pt-cv i]
-pt-cnote:    routine [i [integer!] return: [integer!]][pt-getb pt-cn i]
-pt-scope:    routine [i [integer!] return: [integer!]][pt-getb pt-cs i]
-pt-set-coeff: routine [i [integer!] c [float!]][pt-setf pt-spec-coeff i c]
-pt-set-win:   routine [i [integer!] w [float!]][pt-setf pt-spec-win i w]
-pt-band:      routine [i [integer!] return: [float!]][pt-getf pt-spec-mag i]
+pt-cvol:     routine [i [integer!] return: [integer!]][i: i + 1  as integer! pt-cv/i]
+pt-cnote:    routine [i [integer!] return: [integer!]][i: i + 1  as integer! pt-cn/i]
+pt-scope:    routine [i [integer!] return: [integer!]][i: i + 1  as integer! pt-cs/i]
+pt-set-coeff: routine [i [integer!] c [float!]][i: i + 1  pt-spec-coeff/i: c]
+pt-set-win:   routine [i [integer!] w [float!]][i: i + 1  pt-spec-win/i: w]
+pt-band:      routine [i [integer!] return: [float!]][i: i + 1  pt-spec-mag/i]
 pt-len:      routine [return: [integer!]][either null? pt-modp [0][xmp-mod-len  pt-modp]]
 pt-npat:     routine [return: [integer!]][either null? pt-modp [0][xmp-mod-npat pt-modp]]
 pt-ins:      routine [return: [integer!]][either null? pt-modp [0][xmp-mod-ins  pt-modp]]
@@ -393,20 +411,20 @@ pt-modtype: routine [return: [string!] /local cs [c-string!]][
 ]
 
 ;-- transport
-pt-stop:    routine [][pt-rs-reset-stream]
-pt-restart: routine [][xmp_restart_module pt-ctx  pt-rs-reset-stream]
-pt-setpos:  routine [n [integer!]][xmp_set_position pt-ctx n  pt-rs-reset-stream]
-pt-next:    routine [][xmp_next_position pt-ctx  pt-rs-reset-stream]
-pt-prev:    routine [][xmp_prev_position pt-ctx  pt-rs-reset-stream]
-pt-seek:    routine [ms [integer!]][xmp_seek_time pt-ctx ms  pt-rs-reset-stream]
+pt-stop:       routine [][pt-rs-reset-stream]
+pt-restart:    routine [][xmp_restart_module pt-ctx  pt-rs-reset-stream]
+pt-setpos:     routine [n [integer!]][xmp_set_position pt-ctx n  pt-rs-reset-stream]
+pt-next:       routine [][xmp_next_position pt-ctx  pt-rs-reset-stream]
+pt-prev:       routine [][xmp_prev_position pt-ctx  pt-rs-reset-stream]
+pt-seek:       routine [ms [integer!]][xmp_seek_time pt-ctx ms  pt-rs-reset-stream]
 pt-pause-dev:  routine [][if pt-opened? [SDL_PauseAudioStreamDevice  pt-strm]]
 pt-resume-dev: routine [][if pt-opened? [SDL_ResumeAudioStreamDevice pt-strm]]
-pt-set-loop: routine [v [integer!]][either v = 0 [pt-loopf?: no][pt-loopf?: yes]]
-pt-set-gain: routine [g [float!]][if pt-opened? [SDL_SetAudioStreamGain pt-strm (as float32! g)]]   ;-- output gain, leaves the meters honest
+pt-set-loop:   routine [v [integer!]][either v = 0 [pt-loopf?: no][pt-loopf?: yes]]
+pt-set-gain:   routine [g [float!]][if pt-opened? [SDL_SetAudioStreamGain pt-strm (as float32! g)]]   ;-- output gain, leaves the meters honest
 
 pt-quit: routine [][
 	if pt-loaded? [xmp_end_player pt-ctx  xmp_release_module pt-ctx]
-	if not null? pt-ctx [xmp_free_context pt-ctx]
+	unless null? pt-ctx [xmp_free_context pt-ctx]
 	if pt-opened? [SDL_DestroyAudioStream pt-strm]
 	SDL_Quit
 ]
@@ -419,28 +437,28 @@ pt-quit: routine [][
 ;-- WHITE labels, sunken GRAY value cells with dark data text (no black text boxes)
 col-bg:        158.160.166
 col-bevel-lt:  216.218.226
-col-bevel-dk:   72.74.84
+col-bevel-dk:  72.74.84
 col-face-dn:   140.142.150        ;-- pressed button face
-col-data-bg:     8.8.12           ;-- dark panels : pattern + spectrum wells only
-col-data-edge:  58.62.80
-col-ink:        18.18.24          ;-- data text in gray cells
-col-dim:        92.94.104         ;-- disabled button labels
+col-data-bg:   8.8.12             ;-- dark panels : pattern + spectrum wells only
+col-data-edge: 58.62.80
+col-ink:       18.18.24           ;-- data text in gray cells
+col-dim:       92.94.104          ;-- disabled button labels
 col-white:     248.249.253        ;-- labels + enabled button text
 col-note:      104.138.255        ;-- pattern text (FlodPro blue)
-col-row-hi-bg:  44.56.118
-col-row-hi-tx: 255.255.255
-col-vu-green:   58.228.92
+col-row-hi-bg: 44.56.118
+col-row-hi-tx: white
+col-vu-green:  58.228.92
 col-vu-yellow: 238.220.60
 col-vu-orange: 248.150.46
 col-vu-red:    240.66.52
-col-vu-dark:    30.36.54
-col-vu-well:    10.12.18          ;-- near-black recessed frame behind each VU bar
+col-vu-dark:   30.36.54
+col-vu-well:   10.12.18           ;-- near-black recessed frame behind each VU bar
 col-vu-cap:    188.192.200        ;-- spectrum peak cap base
 col-accent:    250.182.64
 col-cherry-t:  202.80.92          ;-- wordmark : cherry red, top of the glyph shade
 col-cherry-b:  142.38.50          ;-- ... bottom
 col-stem-t:    128.148.66         ;-- wordmark : olive stem green, top
-col-stem-b:     84.104.38         ;-- ... bottom
+col-stem-b:    84.104.38          ;-- ... bottom
 
 ;-- fonts : Consolas (chrome) + Segoe UI Symbol (monochrome glyphs take the gradient pen)
 fnt-mono: make font! [name: "Consolas" style: 'bold]
@@ -451,9 +469,9 @@ fnt-val:  make fnt-mono [size: 15]
 fnt-btn:  make fnt-mono [size: 14]
 fnt-chan: make fnt-mono [size: 11]              ;-- CH numbers : shrunk for narrow columns
 fnt-pat:  make fnt-mono [size: 14 style: none]  ;-- pattern grid : non-bold
-fnt-icon: make fnt-sym [size: 15]
+fnt-icon: make fnt-sym  [size: 15]
 fnt-icon-big: make fnt-sym [size: 20]           ;-- ↻ renders small : upsize it
-fnt-note: make fnt-sym [size: 20]               ;-- 🎶 wordmark flourish
+fnt-note: make fnt-sym  [size: 20]              ;-- 🎶 wordmark flourish
 
 
 ;-- layout (1024 x 768 design) : every region is an origin + size pair ---------
@@ -471,11 +489,11 @@ ch-size:  1008x370
 ;-- param-panel column grid : value cells span x 132..342 (Position cell starts
 ;-- after its spinners); the Volume row locks to the SAME grid — groove left
 ;-- edge at 132, value cell right edge at 342
-vol-org:  132x264      ;-- volume slider groove (param panel's Volume row)
-vol-size: 158x12
-seek-org: 600x305      ;-- song seek slider groove (Song name row)
-seek-size: 330x12
-spin-size: 18x20       ;-- position spinner buttons
+vol-org:    132x264    ;-- volume slider groove (param panel's Volume row)
+vol-size:   158x12
+seek-org:   600x305    ;-- song seek slider groove (Song name row)
+seek-size:  330x12
+spin-size:  18x20      ;-- position spinner buttons
 spin-l-org: 132x66
 spin-r-org: 152x66
 
@@ -503,9 +521,9 @@ SPEC-SAMPLES: 512      ;-- analysis window length, must match PT-FFT-N
 SPEC-CAP-HOLD: 30      ;-- frames the peak cap holds before it starts falling (~0.5s @60fps)
 
 ;-- spectrum geometry : the dark well hugs the bar field with a 2px margin
-spec-bw:   to integer! ((sp-size/x - 20) / SPEC-NB)
+spec-bw:   to-integer (sp-size/x - 20) / SPEC-NB
 spec-used: (SPEC-NB * spec-bw) - 2
-spec-well: as-pair sp-org/x + to integer! ((sp-size/x - spec-used) / 2) sp-org/y + 10
+spec-well: as-pair sp-org/x + ((sp-size/x - spec-used) / 2) sp-org/y + 10
 spec-fh:   sp-size/y - 20
 VU-ATTACK: 33          ;-- VU ballistics : % of the gap eased per frame when rising
 VU-DECAY:  11          ;-- ... and when falling (slow decay = classic pumping meters)
@@ -553,17 +571,17 @@ spec-phold: append/dup make block! 64 0 64   ;-- per-band peak-cap hold counter
 ;-- the literals are conservative fallbacks if size-text is unavailable)
 aw-logo: 16.8
 aw-val:  10.4
-aw-lbl:   9.0
-aw-btn:   9.6
-aw-pat:   8.4
-aw-chan:  7.6                     ;-- narrow-column CH-number advance (fnt-chan)
+aw-lbl:  9.0
+aw-btn:  9.6
+aw-pat:  8.4
+aw-chan: 7.6                     ;-- narrow-column CH-number advance (fnt-chan)
 th-logo: 38                      ;-- measured line-box heights (for vertical centering)
 th-val:  24
 th-lbl:  20
 th-btn:  22
 th-pat:  19
-tb-w:     78                     ;-- time cell width (fits "-00:00")
-tb-x:     930                    ;-- time cell x (right-aligned in the name rows)
+tb-w:    78                      ;-- time cell width (fits "-00:00")
+tb-x:    930                     ;-- time cell x (right-aligned in the name rows)
 
 scratch: make face! [
 	type: 'base
@@ -575,15 +593,13 @@ text-size: func [fnt [object!] str [string!] /local sz][
 	scratch/font: fnt
 	scratch/text: str
 	sz: attempt [size-text scratch]
-	either sz [sz][0x0]
+	any [sz 0x0]
 ]
 
 ;-- y offset that vertically centers a line box of height `th` in a cell of height `ch`
-cen-y: func [ch [integer!] th [number!]][
-	to integer! ((ch - th) / 2)
-]
+cen-y: func [ch [integer!] th [number!]][to integer! (ch - th) / 2]
 
-measure-fonts: func [/local s][
+measure-fonts: func [/local s sz][
 	s: "00000000"
 	sz: text-size fnt-logo s
 	if sz/x > 0 [
@@ -613,7 +629,7 @@ measure-fonts: func [/local s][
 	sz: text-size fnt-chan s
 	if sz/x > 0 [aw-chan: sz/x / 8.0]
 	;-- derive the time-cell + seek-groove geometry from the real glyph width
-	tb-w: 16 + to integer! (aw-val * 6)
+	tb-w: 16 + to integer! aw-val * 6
 	tb-x: nm-org/x + nm-size/x - 8 - tb-w
 	seek-size: as-pair tb-x - 12 - seek-org/x seek-size/y
 ]
@@ -626,7 +642,7 @@ pad2: func [n [integer!]][either n < 10 [rejoin ["0" n]][form n]]
 
 hex2: func [v [integer!] /local hi lo][
 	if v < 0 [v: 0]
-	hi: to integer! (v / 16)
+	hi: to integer! v / 16
 	lo: v - (hi * 16)
 	rejoin [HEXD/(hi + 1) HEXD/(lo + 1)]
 ]
@@ -636,9 +652,9 @@ note-name: func [n [integer!] /local oct idx][
 		n = 0    ["..."]
 		n >= 128 ["==="]
 		true [
-			oct: to integer! ((n - 1) / 12)
+			oct: to integer! (n - 1) / 12
 			idx: (n - 1) - (oct * 12)
-			rejoin [NOTE-NAMES/(idx + 1) (oct + OCT-BASE)]
+			rejoin [NOTE-NAMES/(idx + 1) oct + OCT-BASE]
 		]
 	]
 ]
@@ -661,8 +677,8 @@ pad3-into: func [buf [string!] n [integer!]][
 
 fmt-time-into: func [buf [string!] ms [integer!] /local s m][
 	if ms < 0 [ms: 0]
-	s: to integer! (ms / 1000)
-	m: to integer! (s / 60)
+	s: to integer! ms / 1000
+	m: to integer! s / 60
 	s: s - (m * 60)
 	pad2-into buf m
 	append buf #":"
@@ -684,7 +700,7 @@ note-str: func [n [integer!]][
 	case [
 		n = 0    ["..."]
 		n >= 128 ["==="]
-		true     [note-strs/(n)]
+		true     [note-strs/:n]
 	]
 ]
 
@@ -693,12 +709,12 @@ row-str: func [r [integer!]][either all [r >= 0  r < 256][row-strs/(r + 1)][pad2
 
 cell-buf: func [i [integer!]][
 	while [i > length? cell-pool][append/only cell-pool make string! 12]
-	clear cell-pool/(i)
+	clear cell-pool/:i
 ]
 
 ;-- fill the string tables + allocate the per-slot text buffers (each dynamic text
 ;-- cell needs its OWN series). Called once at startup.
-init: does [
+init: function [][
 	repeat n 127 [append note-strs note-name n]
 	repeat v 256 [append hex-strs hex2 v - 1]
 	repeat r 256 [append row-strs pad2 r - 1]
@@ -759,9 +775,9 @@ emit-val-box-r: func [out [block!] org [pair!] size [pair!] txt [string!] /local
 ;-- white label + drop shadow (caller sets the font)
 emit-lbl-text: func [out [block!] pos [pair!] txt [string!]][
 	compose/into [
-		pen (0.0.0.150)
+		pen  (0.0.0.150)
 		text (pos + 1x1) (txt)
-		pen (col-white)
+		pen  (col-white)
 		text (pos) (txt)
 	] tail out
 ]
@@ -773,7 +789,7 @@ emit-btn: func [out [block!] org [pair!] size [pair!] lbl [string!] mode [word!]
 	][
 		emit-bevel out org size col-bg col-bevel-lt col-bevel-dk
 	]
-	lx: to integer! ((size/x - (aw-btn * length? lbl)) / 2)
+	lx: to integer! (size/x - (aw-btn * length? lbl)) / 2
 	ly: cen-y size/y th-btn
 	if mode = 'dn [
 		lx: lx + 1
@@ -785,7 +801,7 @@ emit-btn: func [out [block!] org [pair!] size [pair!] lbl [string!] mode [word!]
 			pen (col-dim) text (org + (as-pair lx ly)) (lbl)
 		] tail out
 	][
-		emit-lbl-text out (org + (as-pair lx ly)) lbl
+		emit-lbl-text out org + as-pair lx ly lbl
 	]
 ]
 icon-glyphs: ["PLAY" "▶" "PAUSE" "❚❚" "STOP" "■" "LOOP" "↻"]
@@ -803,10 +819,10 @@ measure-icon-inks: function [][
 		append icon-szs text-size get fname gl
 		img: draw 48x48 compose [
 			pen off
-			fill-pen 255.255.255
+			fill-pen white
 			box 0x0 48x48
 			anti-alias on
-			pen 0.0.0
+			pen black
 			font (fname)
 			text 0x0 (gl)
 		]
@@ -816,7 +832,7 @@ measure-icon-inks: function [][
 			inked?: no
 			repeat x 48 [
 				c: pick img as-pair x y
-				if 600 > ((c/1 + c/2) + c/3) [inked?: yes]
+				inked?: 600 > (c/1 + c/2 + c/3)
 			]
 			if inked? [
 				if none? top [top: y - 1]
@@ -838,9 +854,9 @@ emit-btn-glyph: func [out [block!] org [pair!] size [pair!] gl [string!] mode [w
 	sz: any [select icon-szs gl  14x20]        ;-- measured once by measure-icon-inks
 	lx: to integer! ((size/x - sz/x) / 2)
 	ly: either oy: select icon-ink gl [
-		to integer! ((size/y - oy) / 2)          ;-- centre the INK, not the em box
+		to integer! (size/y - oy) / 2          ;-- centre the INK, not the em box
 	][
-		to integer! ((size/y - sz/y) / 2)
+		to integer! (size/y - sz/y) / 2
 	]
 	if mode = 'dn [
 		lx: lx + 1
@@ -890,10 +906,11 @@ emit-vu-bar: func [out [block!] org [pair!] size [pair!] litpx [integer!] /local
 	by:  br/y
 	bx0: org/x + 2                 ;-- bar inset inside the thin black frame
 	bx1: br/x - 2
-	lw: to integer! ((bx1 - bx0) * 2 / 10)       ;-- light band : left fifth
+	lw: to integer! (bx1 - bx0) * 2 / 10       ;-- light band : left fifth
 	if lw < 2 [lw: 2]
-	rw: to integer! ((bx1 - bx0) * 15 / 100)     ;-- dark band : right ~sixth
+	rw: to integer! (bx1 - bx0) * 15 / 100     ;-- dark band : right ~sixth
 	if rw < 2 [rw: 2]
+	
 	if litpx > 1 [
 		ltop: by - litpx
 		compose/into [
@@ -911,6 +928,7 @@ emit-vu-bar: func [out [block!] org [pair!] size [pair!] litpx [integer!] /local
 ;-- static chrome (panels, frames, static labels, logo, wordmark) -------------
 build-chrome: function [][
 	out: make block! 400
+	
 	compose/into [pen off fill-pen (col-bg) box 0x0 (win-size)] tail out
 	emit-bevel out hd-org hd-size col-bg col-bevel-lt col-bevel-dk
 	;-- (the wordmark is drawn by build-wordmark, appended LAST in render :
@@ -927,18 +945,18 @@ build-chrome: function [][
 	emit-bevel out sp-org sp-size col-bg col-bevel-lt col-bevel-dk
 	emit-sunken out (spec-well - 2x2) (as-pair spec-used + 4 spec-fh + 4)
 	;-- the 3 name rows : sunken strips + WHITE right-aligned labels
-	emit-sunken-strip out (nm-org + 0x0)  (as-pair nm-size/x 26)
-	emit-sunken-strip out (nm-org + 0x28) (as-pair nm-size/x 26)
-	emit-sunken-strip out (nm-org + 0x56) (as-pair nm-size/x 26)
+	emit-sunken-strip out nm-org + 0x0  as-pair nm-size/x 26
+	emit-sunken-strip out nm-org + 0x28 as-pair nm-size/x 26
+	emit-sunken-strip out nm-org + 0x56 as-pair nm-size/x 26
 	lbx: nm-org/x + 100
 	lby: cen-y 26 th-lbl
 	append out [font fnt-lbl]
-	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + lby)      "Song:"
-	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + 28 + lby) "File:"
-	emit-lbl-text out (as-pair lbx - to integer! (aw-lbl * 8) nm-org/y + 56 + lby) "Tracker:"
+	emit-lbl-text out as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + lby      "Song:"
+	emit-lbl-text out as-pair lbx - to integer! (aw-lbl * 5) nm-org/y + 28 + lby "File:"
+	emit-lbl-text out as-pair lbx - to integer! (aw-lbl * 8) nm-org/y + 56 + lby "Tracker:"
 	;-- channels panel
 	emit-bevel out ch-org ch-size col-bg col-bevel-lt col-bevel-dk
-	emit-sunken out (ch-org + 6x6) (ch-size - 12x12)
+	emit-sunken out ch-org + 6x6 ch-size - 12x12
 	out
 ]
 
@@ -948,19 +966,22 @@ build-chrome: function [][
 ;-- wordmark) by their ink centre.  First-tick only — never in the frame path.
 ink-bounds: function [fword [word!] str [string!] /local img top bot c inked?][
 	img: draw 240x90 compose [
-		pen off fill-pen 255.255.255 box 0x0 240x90
-		anti-alias on pen 0.0.0 font (fword) text 0x0 (str)
+		pen off fill-pen white box 0x0 240x90
+		anti-alias on pen black font (fword) text 0x0 (str)
 	]
-	top: none  bot: none
+	top: bot: none
 	repeat y 90 [
 		inked?: no
 		repeat x 240 [
 			c: pick img as-pair x y
-			if 600 > ((c/1 + c/2) + c/3) [inked?: yes]
+			if 600 > (c/1 + c/2 + c/3) [inked?: yes]
 		]
-		if inked? [if none? top [top: y - 1]  bot: y - 1]
+		if inked? [
+			if none? top [top: y - 1]
+			bot: y - 1
+		]
 	]
-	either top [reduce [top bot]][reduce [0 0]]
+	either top [reduce [top bot]][copy [0 0]]
 ]
 
 ;-- the wordmark : 🎶 + "Cherry" (cherry-red) + "Tracker" (stem-green), each glyph
@@ -983,6 +1004,7 @@ build-wordmark: function [][
 	lc:  to integer! ((li/1 + li/2) / 2)         ;-- wordmark cap ink centre
 	nb:  ink-bounds 'fnt-note "🎶"               ;-- leading 🎶 ink
 	bey: ly + lc - (to integer! ((nb/1 + nb/2) / 2))
+	
 	compose/into [
 		;-- shadow pass (1px offset, translucent dark) for every glyph
 		font fnt-note
@@ -1065,7 +1087,7 @@ emit-params: function [out [block!]][
 emit-buttons: function [out [block!]][
 	i: 1
 	while [i < length? btns][
-		lbl:  btns/(i)
+		lbl:  btns/:i
 		borg: btns/(i + 1)
 		mode: case [
 			find btn-reserved lbl ['dis]
@@ -1126,7 +1148,7 @@ emit-spectrum: function [out [block!]][
 			spec-phold/(b + 1): SPEC-CAP-HOLD             ;-- arm the hold
 		][
 			either spec-phold/(b + 1) > 0 [
-				spec-phold/(b + 1): (spec-phold/(b + 1)) - 1   ;-- holding : stay put
+				spec-phold/(b + 1): spec-phold/(b + 1) - 1   ;-- holding : stay put
 			][
 				pk: pk - 3                                ;-- hold expired : fall (3 px/frame)
 			]
@@ -1146,6 +1168,7 @@ emit-names: function [out [block!]][
 	el: either find [playing paused draining] state [pt-time-ms][0]
 	if el > tot [el: tot]
 	vy: cen-y 26 th-val
+	
 	compose/into [pen (col-ink) font fnt-val
 		text (as-pair nm-org/x + 108 nm-org/y + vy)      (name-cache)
 		text (as-pair nm-org/x + 108 nm-org/y + 28 + vy) (file-line)
@@ -1154,8 +1177,8 @@ emit-names: function [out [block!]][
 	;-- quantize to whole seconds ONCE so both time cells flip in the same frame
 	frac: either tot > 0 [(1.0 * el) / tot][0.0]
 	emit-slider out seek-org seek-size frac
-	els:  to integer! (el / 1000)
-	tots: to integer! (tot / 1000)
+	els:  to integer! el / 1000
+	tots: to integer! tot / 1000
 	clear el-buf
 	fmt-time-into el-buf (1000 * els)
 	emit-val-box-r out (as-pair tb-x nm-org/y + 3)  (as-pair tb-w 20) el-buf
@@ -1181,20 +1204,20 @@ emit-chan-notes: function [out [block!]][
 	nrows: view-nrows
 	cc-x: ch-org/x + 44                          ;-- columns inside the inset, after the row gutter
 	cc-w: ch-size/x - 54
-	colw: to integer! (cc-w / nch)
-	vuw: to integer! (colw * 3 / 10)             ;-- match emit-chan-vu
+	colw: to integer! cc-w / nch
+	vuw: to integer! colw * 3 / 10               ;-- match emit-chan-vu
 	if vuw > 38 [vuw: 38]
 	if vuw < 12 [vuw: 12]
-	if vuw > (colw - 8) [vuw: colw - 8]        ;-- ultra-narrow columns (32+ channels)
+	if vuw > (colw - 8) [vuw: colw - 8]          ;-- ultra-narrow columns (32+ channels)
 	if vuw < 4 [vuw: 4]
 	notex: vuw + 9                               ;-- note text clears the (wider) VU bar
 	showtext?:  colw >= (notex + 76)
 	shownotes?: colw >= 46                       ;-- below this, meters only
 	rh: 20                                       ;-- >= line height so rows never overlap
-	visible: to integer! ((ch-size/y - 40) / rh)
+	visible: to integer! (ch-size/y - 40) / rh
 	if visible < 3 [visible: 3]
 	if even? visible [visible: visible - 1]
-	half: to integer! ((visible - 1) / 2)
+	half: to integer! (visible - 1) / 2
 	;-- VU wells first : they must sit UNDER the row highlight (see emit-vu-bar)
 	vuh:   ch-size/y - 40
 	vutop: ch-org/y + 30
@@ -1217,14 +1240,14 @@ emit-chan-notes: function [out [block!]][
 		][
 			lbl: chn-strs/(c + 1)
 			;-- shrink the font once a 2-digit number no longer clears the column
-			either (2 * aw-lbl) + 6 > colw [
+			aw: either (2 * aw-lbl) + 6 > colw [
 				fname: 'fnt-chan
-				aw:    aw-chan
+				aw-chan
 			][
 				fname: 'fnt-lbl
-				aw:    aw-lbl
+				aw-lbl
 			]
-			lx: cx + to integer! ((colw - (aw * length? lbl)) / 2)
+			lx: cx + to integer! (colw - (aw * length? lbl)) / 2
 		]
 		compose/into [pen (col-white) font (fname) text (as-pair lx ch-org/y + 8) (lbl)] tail out
 		c: c + 1
@@ -1257,6 +1280,7 @@ emit-chan-notes: function [out [block!]][
 							append buf hex-str pt-cell cpat c rr 4
 							buf
 						][note-str nt]
+						
 						compose/into [pen (txcol) font fnt-pat text (as-pair cx cy) (cell)] tail out
 						c: c + 1
 					]
@@ -1287,7 +1311,7 @@ emit-chan-vu: function [out [block!]][
 	while [c < nch][
 		cx: cc-x + (c * colw) + 4
 		v: pt-cvol c
-		target: to integer! (v * vuh / vb)
+		target: to integer! v * vuh / vb
 		if target > vuh [target: vuh]
 		;-- ease the displayed level toward the target : fast attack, slow decay
 		lvl: vu-level/(c + 1)
@@ -1311,7 +1335,7 @@ emit-chan-vu: function [out [block!]][
 ;-- assemble all layers into the ONE persistent frame block (it IS canvas/draw).
 ;-- clear keeps capacity; every emitted value is immediate or a reused reference,
 ;-- so a warm frame allocates NOTHING.
-render: does [
+render: func [/local n][
 	clear frame-tail                        ;-- keep the anti-alias/scale prefix
 	append frame-blk chrome-block
 	emit-params   frame-blk
@@ -1389,7 +1413,7 @@ do-action: func [lbl [string!]][
 	]
 ]
 
-apply-volume: does [pt-set-gain (volume / 100.0)]
+apply-volume: does [pt-set-gain volume / 100.0]
 
 set-vol-from-x: func [dx [integer!] /local v][
 	v: to integer! ((dx - vol-org/x) * 100 / vol-size/x)
@@ -1406,7 +1430,7 @@ do-seek-x: func [dx [integer!] /local tot frac ms][
 	frac: (1.0 * (dx - seek-org/x)) / seek-size/x
 	if frac < 0.0 [frac: 0.0]
 	if frac > 1.0 [frac: 1.0]
-	ms: to integer! (frac * tot)
+	ms: to integer! frac * tot
 	if 1200 < absolute (ms - last-seek-ms) [
 		last-seek-ms: ms
 		if state = 'paused [pt-resume-dev]
@@ -1417,12 +1441,10 @@ do-seek-x: func [dx [integer!] /local tot frac ms][
 
 ;-- map a logical face offset back to 1024x768 design (inverse of the letterbox transform)
 to-design: func [ofs [pair! point2D!]][
-	as-pair
-		to integer! ((ofs/x - fit-ofs/x) / fit-s)
-		to integer! ((ofs/y - fit-ofs/y) / fit-s)
+	as-pair (ofs/x - fit-ofs/x) / fit-s	(ofs/y - fit-ofs/y) / fit-s
 ]
 
-pt-on-down: func [ofs [pair! point2D!] /local pos][
+pt-on-down: func [ofs [pair! point2D!] /local pos lbl borg][
 	pos: to-design ofs
 	btn-pressed: none
 	case [
@@ -1454,7 +1476,7 @@ pt-on-down: func [ofs [pair! point2D!] /local pos][
 	]
 ]
 
-pt-on-up: func [ofs [pair! point2D!] /local pos][
+pt-on-up: func [ofs [pair! point2D!] /local pos lbl borg][
 	pos: to-design ofs
 	if btn-pressed [
 		foreach [lbl borg] btns [
@@ -1478,13 +1500,13 @@ pt-on-over: func [ofs [pair! point2D!] /local d][
 
 load-file: func [f [file!] /local data res][
 	data: attempt [read/binary f]
-	either none? data [
-		name-cache: "<file not found>"
-		loaded?: no
-		state: 'idle
-	][
-		res: pt-load-mem data
-		either zero? res [
+	case [
+		none? data [
+			name-cache: "<file not found>"
+			loaded?: no
+			state: 'idle
+		]
+		zero? res: pt-load-mem data [
 			name-cache: pt-songname
 			type-cache: pt-modtype
 			file-cache: form second split-path f
@@ -1504,7 +1526,8 @@ load-file: func [f [file!] /local data res][
 			last-seek-ms: 0
 			vu-level: append/dup make block! 64 0 64
 			apply-volume
-		][
+		]
+		true [
 			name-cache: rejoin ["<load error " res ">"]
 			loaded?: no
 			state: 'idle
@@ -1512,7 +1535,7 @@ load-file: func [f [file!] /local data res][
 	]
 ]
 
-load-mod: does [
+load-mod: function [][
 	f: request-file/title "Load module"
 	if none? f [exit]
 	if block? f [f: first f]
@@ -1530,7 +1553,7 @@ tick-frame: does [
 	]
 	switch state [
 		playing [
-			if 1 = pt-pump [state: 'draining]     ;-- decoded to the end : let the queue play out
+			if pt-pump [state: 'draining]         ;-- decoded to the end : let the queue play out
 			pt-sync
 		]
 		draining [
@@ -1560,7 +1583,7 @@ tick-frame: does [
 
 ;-- precompute the Goertzel coefficients (2*cos w) + the Hann window in Red,
 ;-- push them to R/S (no trig needed on the R/S side)
-fill-spec-coeffs: does [
+fill-spec-coeffs: function [][
 	lr: log-e (SPEC-FMAX / SPEC-FMIN)
 	i: 0
 	while [i < SPEC-NB][
@@ -1584,7 +1607,6 @@ frame-blk: make block! 6000
 chan-blk:  make block! 1600
 frame-tail: none                ;-- set right after the scale prefix, below
 
-;-- Red/View is per-monitor-DPI-aware (manifest) -> face coords are LOGICAL.
 ;-- Size the canvas = physical(1024x768) / desktop-scale; draw through `scale`.
 DPI: 1.0
 attempt [
@@ -1593,7 +1615,7 @@ attempt [
 ]
 if DPI <= 0.0 [DPI: 1.0]
 draw-scale: 1.0 / DPI
-face-size: as-pair to integer! (win-size/x * draw-scale) to integer! (win-size/y * draw-scale)
+face-size: as-pair (win-size/x * draw-scale) (win-size/y * draw-scale)
 
 ;-- LETTERBOX FIT : scale the 1024x768 design to the largest 4:3 size that fits,
 ;-- centre it, fill the margins with chrome gray. Recomputed on resize/maximize.
@@ -1603,12 +1625,11 @@ fit-ofs: 0x0                    ;-- device-space centring offset (pair!)
 recompute-fit: func [sz [pair!]][
 	fit-s: min (1.0 * sz/x / win-size/x) (1.0 * sz/y / win-size/y)
 	fit-ofs: as-pair
-		to integer! ((sz/x - (win-size/x * fit-s)) / 2)
-		to integer! ((sz/y - (win-size/y * fit-s)) / 2)
+		(sz/x - (win-size/x * fit-s)) / 2
+		(sz/y - (win-size/y * fit-s)) / 2
 ]
 
 ;-- (re)build the permanent Draw prefix for canvas size `sz` : full-canvas gray fill
-;-- (letterbox margins) + translate/scale; frame-tail is left right after it
 rebuild-prefix: func [sz [pair!]][
 	recompute-fit sz
 	clear frame-blk
@@ -1651,7 +1672,7 @@ relayout: func [sz [pair!]][
 ;-- `rate` timer for the drag so audio+animation keep going; the loop disarms it.
 arm-modal-timer: does [unless timer-on? [canvas/rate: 60  timer-on?: yes]]
 
-win/flags: [resize]             ;-- WS_THICKFRAME + keeps the maximize box (gui.reds OS-make-view)
+win/flags: [resize]
 win/actors: make object! [
 	;-- close : latch `closing?`, kill any timer, silence the device; the loop then exits
 	on-close: func [face [object!] event [event!]][

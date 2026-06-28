@@ -1,5 +1,5 @@
 Red/System [
-	Title:   "protracker-red — libxmp binding"
+	Title:   "CherryTracker — libxmp binding"
 	Author:  "Nenad Rakocevic"
 	Purpose: {
         Thin Red/System binding for libxmp 4.7 (the Extended Module Player
@@ -8,7 +8,7 @@ Red/System [
         xmp_module structures that carry the per-channel volume + note data
         the visualiser needs.
 
-        libxmp only DECODES a module into PCM; audio output is done elsewhere
+        libxmp only DECODES a module into PCM, audio output is done elsewhere
         (audio.reds). xmp_play_frame renders one replay tick into
         frame_info.buffer (buffer_size bytes, signed 16-bit stereo at the rate
         passed to xmp_start_player).
@@ -120,7 +120,7 @@ peek-u8: func [b [byte-ptr!] ofs [integer!] return: [integer!] /local p [byte-pt
 ]
 
 ;-- channel_info[i] lives at 72 + i*24; field is the byte offset within it
-chan-off: func [i [integer!] field [integer!] return: [integer!]][
+chan-off: func [i field [integer!] return: [integer!]][
 	72 + (i * 24) + field
 ]
 
@@ -171,14 +171,14 @@ xmp-event: func [
 	return: [integer!]
 	/local xxp [int-ptr!] xxt [int-ptr!] patp [byte-ptr!] trkp [byte-ptr!] trk [integer!]
 ][
-	xxp: as int-ptr! (peek-i32 m 168)
+	xxp: as int-ptr! peek-i32 m 168
 	if null? xxp [return 0]
-	patp: as byte-ptr! (peek-i32 (as byte-ptr! xxp) (pat * 4))   ;-- xxp[pat]
+	patp: as byte-ptr! peek-i32 (as byte-ptr! xxp) (pat * 4)   ;-- xxp[pat]
 	if null? patp [return 0]
-	trk: peek-i32 patp (4 + (chn * 4))                           ;-- index[chn]
-	xxt: as int-ptr! (peek-i32 m 172)
+	trk: peek-i32 patp 4 + (chn * 4)                           ;-- index[chn]
+	xxt: as int-ptr! peek-i32 m 172
 	if null? xxt [return 0]
-	trkp: as byte-ptr! (peek-i32 (as byte-ptr! xxt) (trk * 4))   ;-- xxt[trk]
+	trkp: as byte-ptr! peek-i32 (as byte-ptr! xxt) (trk * 4)   ;-- xxt[trk]
 	if null? trkp [return 0]
-	peek-u8 trkp (4 + (row * 8) + field)                         ;-- event[row].field
+	peek-u8 trkp 4 + (row * 8) + field                         ;-- event[row].field
 ]
